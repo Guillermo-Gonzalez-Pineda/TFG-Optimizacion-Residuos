@@ -33,3 +33,26 @@ npm-debug.log*
 # Cache
 .cache/
 .pytest_cache/
+
+# Entorno virtual
+venv/
+.venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+*.pyc
+__pycache__/
+
+# Datos intermedios (ajusta según tu proyecto)
+data/raw/
+*.gpkg
+*.geojson
+
+# Gurobi
+*.lp
+*.mps
+
+# Sistema
+.DS_Store
+*.log
