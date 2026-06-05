@@ -120,46 +120,6 @@ def compute_demand(
     return h_i * params.waste_per_capita * params.waste_proportion[k]
 
 
-def load_instance(path: str) -> Instance:
-    """Load a problem instance from a JSON file."""
-    with open(path, 'r') as f:
-        data = json.load(f)
-
-    # Convert nested dicts to dataclasses
-    i_to_idx = data['i_to_idx']
-    idx_to_i = {int(k): v for k, v in data['idx_to_i'].items()}
-    j_to_idx = data['j_to_idx']
-    idx_to_j = {int(k): v for k, v in data['idx_to_j'].items()}
-
-    I = {int(k): BuildingData(**v) for k, v in data['I'].items()}
-    J = {int(k): CandidateData(**v) for k, v in data['J'].items()}
-
-    dij = {int(i): {int(j): d for j, d in j_dict.items()} for i, j_dict in data['dij'].items()}
-
-    params = ModelParameters(**data['params'])
-
-    return Instance(
-        study_case=data['study_case'],
-        osm_radius_m=data['osm_radius_m'],
-        dijkstra_radius_m=data['dijkstra_radius_m'],
-        generated_at=data['generated_at'],
-        references=data['references'],
-        n_buildings=data['n_buildings'],
-        n_candidates=data['n_candidates'],
-        n_waste_types=data['n_waste_types'],
-        total_population=data['total_population'],
-        n_dijkstra_connections=data['n_dijkstra_connections'],
-        i_to_idx=i_to_idx,
-        idx_to_i=idx_to_i,
-        j_to_idx=j_to_idx,
-        idx_to_j=idx_to_j,
-        K=data['K'],
-        I=I,
-        J=J,
-        dij=dij,
-        params=params
-    )
-
 
 def load_instance(path: str) -> Instance:
     """Deserialise an Instance from a JSON file."""
