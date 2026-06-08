@@ -37,7 +37,10 @@ from lagrangiana import (
     LRSolution,
     Multipliers,
     precompute_valid_candidates,
+    repair_solution,
+    solve_plr_x,
     solve_plr_yw,
+    solve_plr_z,
 )
 
 # ---------------------------------------------------------------------------
@@ -1027,3 +1030,1362 @@ class TestSolvePlrYw:
         m  = Multipliers(mu=mu, lbd=np.zeros(n_j), nu=nu)
         _, _, obj = solve_plr_yw(laguna, m, vc)
         assert obj == pytest.approx(3144.8001173912235, rel=1e-9)
+
+
+# ===========================================================================
+# 7. Tests de solve_plr_x
+# ===========================================================================
+
+@pytest.fixture(scope="module")
+def total_demand(laguna) -> np.ndarray:
+    """Demanda total Σᵢ q_ik por tipo k sobre la instancia Laguna."""
+    n_k = laguna.n_waste_types
+    td = np.zeros(n_k)
+    for i in range(laguna.n_buildings):
+        for k in range(n_k):
+            td[k] += compute_demand(laguna.I[i].h_i, laguna.params, k)
+    return td
+
+
+@pytest.fixture(scope="module")
+def plrx_zero(laguna, mults_zero) -> tuple[np.ndarray, float]:
+    """solve_plr_x con todos los multiplicadores a cero."""
+    return solve_plr_x(laguna, mults_zero)
+
+
+class TestSolvePlrX:
+    """
+    Tests para solve_plr_x — subproblema de colocación de contenedores P_LR_x.
+
+    Formulación:
+        coef[j,k] = c_k + λ_j + ν_{jk} - μ_{jk} · Q_k
+        x*        = greedy por coef ascendente cubriendo Σⱼ Q_k·x[j,k] ≥ Σᵢ q_ik
+        obj_plrx  = Σ_{j,k} coef[j,k] · x[j,k]
+
+    Propiedad estructural: el greedy asigna en un único paso todos los bins
+    necesarios al primer candidato en orden (ceil de la demanda restante),
+    lo que implica exactamente 1 candidato con bins por tipo de residuo.
+
+    Instancia de referencia: instancia_laguna.json
+      · 740 edificios, 133 candidatos, 4 tipos
+      · bin_capacity = 120 para todos los tipos
+      · bin_cost = {0: 350, 1: 300, 2: 250, 3: 500}
+      · total_demand ≈ [6418.16, 1012.92, 4974.97, 399.53]
+      · min_bins (mults=0) = [54, 9, 42, 4]
+    """
+
+    # -----------------------------------------------------------------------
+    # 1. Shape y tipo de la salida
+    # -----------------------------------------------------------------------
+
+    def test_x_shape(self, laguna, plrx_zero):
+        """x debe tener shape (n_candidates, n_waste_types)."""
+        x, _ = plrx_zero
+        assert x.shape == (laguna.n_candidates, laguna.n_waste_types), (
+            f"Shape inesperado: {x.shape}"
+        )
+
+    def test_x_dtype_is_integer(self, plrx_zero):
+        """x debe ser un array de enteros (número de contenedores)."""
+        x, _ = plrx_zero
+        assert np.issubdtype(x.dtype, np.integer), (
+            f"x debe ser dtype entero, obtenido {x.dtype}"
+        )
+
+    def test_obj_is_scalar_float(self, plrx_zero):
+        """obj_plrx debe ser un float escalar."""
+        _, obj = plrx_zero
+        assert isinstance(obj, float), f"obj_plrx debe ser float, obtenido {type(obj)}"
+        assert np.ndim(obj) == 0
+
+    # -----------------------------------------------------------------------
+    # 2. Restricción (26): Σⱼ Q_k · x[j,k] ≥ Σᵢ q_ik para todo k
+    # -----------------------------------------------------------------------
+
+    def test_capacity_covers_demand_zero_multipliers(self, laguna, plrx_zero, total_demand):
+        """Con mults=0, la capacidad instalada cubre la demanda para cada tipo k."""
+        x, _ = plrx_zero
+        bin_cap = np.array([laguna.params.bin_capacity[k] for k in laguna.K])
+        for k in range(laguna.n_waste_types):
+            installed = float(np.sum(x[:, k]) * bin_cap[k])
+            assert installed >= total_demand[k] - 1e-9, (
+                f"k={k}: capacidad={installed:.4f} < demanda={total_demand[k]:.4f}"
+            )
+
+    @pytest.mark.parametrize("seed", [42, 7, 99])
+    def test_capacity_covers_demand_random_multipliers(self, laguna, total_demand, seed):
+        """Para multiplicadores aleatorios, la restricción (26) se cumple siempre."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(seed)
+        m = Multipliers(
+            mu=np.random.rand(n_j, n_k) * 0.5,
+            lbd=np.random.rand(n_j) * 0.1,
+            nu=np.random.rand(n_j, n_k) * 0.1,
+        )
+        x, _ = solve_plr_x(laguna, m)
+        bin_cap = np.array([laguna.params.bin_capacity[k] for k in laguna.K])
+        for k in range(n_k):
+            installed = float(np.sum(x[:, k]) * bin_cap[k])
+            assert installed >= total_demand[k] - 1e-9, (
+                f"seed={seed} k={k}: capacidad={installed:.4f} < demanda={total_demand[k]:.4f}"
+            )
+
+    # -----------------------------------------------------------------------
+    # 3. Con multiplicadores a cero: coef[j,k] = c_k → bins mínimos en j=0
+    # -----------------------------------------------------------------------
+
+    def test_zero_multipliers_total_bins_is_minimum_per_type(
+        self, laguna, plrx_zero, total_demand
+    ):
+        """Con mults=0, el total de bins instalados por tipo es el mínimo necesario."""
+        import math
+        x, _ = plrx_zero
+        bin_cap = np.array([laguna.params.bin_capacity[k] for k in laguna.K])
+        for k in range(laguna.n_waste_types):
+            min_bins = math.ceil(total_demand[k] / bin_cap[k])
+            actual = int(np.sum(x[:, k]))
+            assert actual == min_bins, (
+                f"k={k}: bins instalados={actual}, mínimo esperado={min_bins}"
+            )
+
+    def test_zero_multipliers_only_j0_has_bins(self, plrx_zero):
+        """Con mults=0, coefs iguales por tipo: solo j=0 recibe bins (argsort ASC)."""
+        x, _ = plrx_zero
+        for k in range(x.shape[1]):
+            nonzero = np.where(x[:, k] > 0)[0]
+            assert len(nonzero) == 1, (
+                f"k={k}: {len(nonzero)} candidatos con bins, esperado 1"
+            )
+            assert nonzero[0] == 0, (
+                f"k={k}: bins en j={nonzero[0]}, esperado j=0"
+            )
+
+    def test_zero_multipliers_obj_equals_cost_times_min_bins(
+        self, laguna, plrx_zero, total_demand
+    ):
+        """Con mults=0: obj = Σ_k c_k · ceil(demand_k / Q_k)."""
+        import math
+        _, obj = plrx_zero
+        bin_cost = np.array([laguna.params.bin_cost[k] for k in laguna.K])
+        bin_cap = np.array([laguna.params.bin_capacity[k] for k in laguna.K])
+        expected = float(sum(
+            bin_cost[k] * math.ceil(total_demand[k] / bin_cap[k])
+            for k in range(laguna.n_waste_types)
+        ))
+        assert obj == pytest.approx(expected, rel=1e-9)
+
+    # -----------------------------------------------------------------------
+    # 4. Con mu muy grande en un candidato concreto, ese candidato recibe todos los bins
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.parametrize("j_star", [0, 5, 50, 132])
+    def test_large_mu_concentrates_all_bins_at_j_star(
+        self, laguna, total_demand, j_star
+    ):
+        """
+        mu[j*,:] = 1e6 → coef[j*,k] << 0 → greedy pone todos los bins en j*.
+        Ningún otro candidato recibe bins.
+        """
+        import math
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        bin_cap = np.array([laguna.params.bin_capacity[k] for k in laguna.K])
+        mu = np.zeros((n_j, n_k))
+        mu[j_star, :] = 1e6
+        m = Multipliers(mu=mu, lbd=np.zeros(n_j), nu=np.zeros((n_j, n_k)))
+        x, _ = solve_plr_x(laguna, m)
+
+        for k in range(n_k):
+            min_bins = math.ceil(total_demand[k] / bin_cap[k])
+            assert x[j_star, k] == min_bins, (
+                f"j*={j_star} k={k}: x={x[j_star,k]}, esperado {min_bins}"
+            )
+            assert int(np.sum(x[:, k])) == min_bins, (
+                f"j*={j_star} k={k}: total bins={np.sum(x[:,k])}, "
+                f"esperado {min_bins} (concentrados en j*)"
+            )
+
+    # -----------------------------------------------------------------------
+    # 5. obj_plrx = Σ_{j,k} coef[j,k] · x[j,k] — verificación directa
+    # -----------------------------------------------------------------------
+
+    def test_obj_equals_coef_dot_x_zero_multipliers(self, laguna, plrx_zero):
+        """Con mults=0: obj = Σ_{j,k} c_k · x[j,k] (fórmula directa)."""
+        x, obj = plrx_zero
+        bin_cost = np.array([laguna.params.bin_cost[k] for k in laguna.K])
+        expected = float(np.sum(bin_cost * x))
+        assert obj == pytest.approx(expected, rel=1e-9)
+
+    @pytest.mark.parametrize("seed", [0, 42, 7])
+    def test_obj_equals_coef_dot_x_random_multipliers(self, laguna, seed):
+        """obj = Σ_{j,k} coef[j,k]·x[j,k] con multiplicadores aleatorios (seed={seed})."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(seed)
+        mu = np.random.rand(n_j, n_k) * 0.5
+        lbd = np.random.rand(n_j) * 0.1
+        nu = np.random.rand(n_j, n_k) * 0.1
+        m = Multipliers(mu=mu, lbd=lbd, nu=nu)
+        x, obj = solve_plr_x(laguna, m)
+        bin_cost = np.array([laguna.params.bin_cost[k] for k in laguna.K])
+        bin_cap = np.array([laguna.params.bin_capacity[k] for k in laguna.K])
+        coef = bin_cost + lbd[:, np.newaxis] + nu - mu * bin_cap
+        expected = float(np.sum(coef * x))
+        assert obj == pytest.approx(expected, rel=1e-9), (
+            f"seed={seed}: obj={obj:.6f}, expected={expected:.6f}"
+        )
+
+    # -----------------------------------------------------------------------
+    # 6. x contiene solo enteros no negativos
+    # -----------------------------------------------------------------------
+
+    def test_x_non_negative_zero_multipliers(self, plrx_zero):
+        """Todos los elementos de x son ≥ 0 con multiplicadores cero."""
+        x, _ = plrx_zero
+        assert np.all(x >= 0), f"x tiene valores negativos: min={x.min()}"
+
+    @pytest.mark.parametrize("seed", [13, 21, 55])
+    def test_x_non_negative_random_multipliers(self, laguna, seed):
+        """x ≥ 0 incluso con coeficientes muy negativos (mu grande)."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(seed)
+        m = Multipliers(
+            mu=np.random.rand(n_j, n_k) * 2.0,
+            lbd=np.random.rand(n_j) * 0.1,
+            nu=np.random.rand(n_j, n_k) * 0.05,
+        )
+        x, _ = solve_plr_x(laguna, m)
+        assert np.all(x >= 0), f"seed={seed}: x tiene valores negativos, min={x.min()}"
+
+    def test_x_integer_valued(self, plrx_zero):
+        """x contiene exclusivamente enteros (no fracciones de contenedor)."""
+        x, _ = plrx_zero
+        assert np.array_equal(x, x.astype(int)), "x contiene valores no enteros"
+
+    # -----------------------------------------------------------------------
+    # 7. Caso límite: demanda total cero → x = 0 para ese tipo
+    # -----------------------------------------------------------------------
+
+    def test_zero_demand_yields_zero_x_and_zero_obj(self):
+        """h_i=0 para todos los edificios → demanda=0 → x=0 y obj=0.0."""
+        I = {0: _bld(0, h_i=0), 1: _bld(1, h_i=0)}
+        J = {j: _cand(j) for j in range(3)}
+        inst = _make_instance(I, J, dij={})
+        m = Multipliers(
+            mu=np.zeros((3, 4)),
+            lbd=np.zeros(3),
+            nu=np.zeros((3, 4)),
+        )
+        x, obj = solve_plr_x(inst, m)
+        assert np.all(x == 0), f"Esperado x=0 con demanda nula, obtenido max={x.max()}"
+        assert obj == 0.0, f"Esperado obj=0.0, obtenido {obj}"
+
+    def test_zero_demand_yields_zero_x_with_nonzero_multipliers(self):
+        """Con demanda cero, x=0 independientemente de los multiplicadores."""
+        np.random.seed(11)
+        I = {0: _bld(0, h_i=0)}
+        J = {j: _cand(j) for j in range(3)}
+        inst = _make_instance(I, J, dij={})
+        m = Multipliers(
+            mu=np.random.rand(3, 4),
+            lbd=np.random.rand(3),
+            nu=np.random.rand(3, 4),
+        )
+        x, _ = solve_plr_x(inst, m)
+        assert np.all(x == 0), (
+            "Con demanda=0 y mults≠0: x debe ser todo ceros"
+        )
+
+    def test_zero_demand_per_type_when_hi_zero_all_types(self):
+        """h_i=0 anula la demanda de todos los tipos (q_ik = h_i · α · p_k = 0)."""
+        I = {0: _bld(0, h_i=0)}
+        J = {0: _cand(0)}
+        inst = _make_instance(I, J, dij={})
+        m = Multipliers(
+            mu=np.zeros((1, 4)),
+            lbd=np.zeros(1),
+            nu=np.zeros((1, 4)),
+        )
+        x, _ = solve_plr_x(inst, m)
+        for k in range(4):
+            assert int(np.sum(x[:, k])) == 0, f"k={k}: x[:,k]={x[:,k]} debe ser ceros"
+
+    # -----------------------------------------------------------------------
+    # 8. Greedy instala en orden de coeficiente ascendente
+    # -----------------------------------------------------------------------
+
+    def test_greedy_lowest_coef_candidate_receives_all_bins(self):
+        """
+        Instancia sintética: 3 candidatos, 1 tipo, 1 bin necesario.
+        lbd=[10, 5, 1] → coef=[310, 305, 301] → j=2 (coef mínimo) gana.
+        j=0 y j=1 reciben 0 bins.
+        """
+        params = ModelParameters(
+            opening_cost=4000.0, max_bins=8, nimby_distance=10.0,
+            waste_per_capita=1.32, overflow_penalty=500.0,
+            bin_cost={0: 300.0},
+            bin_capacity={0: 100.0},
+            coverage_radius={0: 150.0},
+            waste_proportion={0: 1.0},
+            collection_frequency={0: 1.0},
+            lognormal_mu=0.0, lognormal_sigma=0.25, overflow_threshold=0.05,
+        )
+        # demand = 50 * 1.32 * 1.0 = 66 → ceil(66/100) = 1 bin
+        I = {0: _bld(0, h_i=50)}
+        J = {j: _cand(j) for j in range(3)}
+        inst = _make_instance(I, J, dij={}, K=[0], params=params)
+
+        lbd = np.array([10.0, 5.0, 1.0])   # coefs: 310, 305, 301
+        m = Multipliers(mu=np.zeros((3, 1)), lbd=lbd, nu=np.zeros((3, 1)))
+        x, obj = solve_plr_x(inst, m)
+
+        assert x[2, 0] == 1, (
+            f"j=2 (coef=301, mínimo) debe recibir 1 bin, obtenido {x[2,0]}"
+        )
+        assert x[0, 0] == 0, (
+            f"j=0 (coef=310) no debe recibir bins, obtenido {x[0,0]}"
+        )
+        assert x[1, 0] == 0, (
+            f"j=1 (coef=305) no debe recibir bins, obtenido {x[1,0]}"
+        )
+        assert obj == pytest.approx(301.0, rel=1e-9), f"obj={obj} esperado=301.0"
+
+    def test_greedy_stops_once_demand_met(self):
+        """
+        2 candidatos, capacidad de bin > demanda total.
+        El primero (coef menor) cubre la demanda en un único paso;
+        el segundo no debe recibir ningún bin.
+        """
+        params = ModelParameters(
+            opening_cost=4000.0, max_bins=8, nimby_distance=10.0,
+            waste_per_capita=1.32, overflow_penalty=500.0,
+            bin_cost={0: 300.0},
+            bin_capacity={0: 200.0},  # 1 bin de 200 cubre demand=132
+            coverage_radius={0: 150.0},
+            waste_proportion={0: 1.0},
+            collection_frequency={0: 1.0},
+            lognormal_mu=0.0, lognormal_sigma=0.25, overflow_threshold=0.05,
+        )
+        # demand = 100 * 1.32 = 132 → ceil(132/200) = 1 bin
+        I = {0: _bld(0, h_i=100)}
+        J = {0: _cand(0), 1: _cand(1)}
+        inst = _make_instance(I, J, dij={}, K=[0], params=params)
+
+        lbd = np.array([0.0, 5.0])   # j=0 más barato → gana
+        m = Multipliers(mu=np.zeros((2, 1)), lbd=lbd, nu=np.zeros((2, 1)))
+        x, _ = solve_plr_x(inst, m)
+
+        assert x[0, 0] == 1, f"j=0 debe recibir 1 bin, obtenido {x[0,0]}"
+        assert x[1, 0] == 0, (
+            f"j=1 no debe recibir bins (demanda cubierta tras j=0), obtenido {x[1,0]}"
+        )
+
+    def test_greedy_winner_has_minimum_coef_random_multipliers(self, laguna):
+        """
+        El candidato que recibe bins para cada tipo k debe ser aquel con
+        coef[j,k] mínimo — verificado con multiplicadores aleatorios.
+        """
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(42)
+        mu = np.random.rand(n_j, n_k) * 0.5
+        lbd = np.random.rand(n_j) * 0.1
+        nu = np.random.rand(n_j, n_k) * 0.1
+        m = Multipliers(mu=mu, lbd=lbd, nu=nu)
+        x, _ = solve_plr_x(laguna, m)
+
+        bin_cost = np.array([laguna.params.bin_cost[k] for k in laguna.K])
+        bin_cap = np.array([laguna.params.bin_capacity[k] for k in laguna.K])
+        coef = bin_cost + lbd[:, np.newaxis] + nu - mu * bin_cap
+
+        for k in range(n_k):
+            j_winner = int(np.where(x[:, k] > 0)[0][0])
+            j_min = int(np.argmin(coef[:, k]))
+            assert j_winner == j_min, (
+                f"k={k}: j_winner={j_winner} (coef={coef[j_winner,k]:.4f}) "
+                f"≠ j_argmin={j_min} (coef={coef[j_min,k]:.4f})"
+            )
+
+    def test_greedy_exactly_one_candidate_per_type(self, laguna):
+        """
+        Propiedad estructural: el greedy cubre toda la demanda en un único paso
+        (ceil), por lo que exactamente 1 candidato por tipo tiene bins > 0.
+        """
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(7)
+        m = Multipliers(
+            mu=np.random.rand(n_j, n_k) * 0.3,
+            lbd=np.random.rand(n_j) * 0.1,
+            nu=np.random.rand(n_j, n_k) * 0.05,
+        )
+        x, _ = solve_plr_x(laguna, m)
+        for k in range(n_k):
+            n_nonzero = int(np.sum(x[:, k] > 0))
+            assert n_nonzero == 1, (
+                f"k={k}: {n_nonzero} candidatos con bins, esperado exactamente 1"
+            )
+
+    # -----------------------------------------------------------------------
+    # 9. Regresión (valores fijados sobre instancia real)
+    # -----------------------------------------------------------------------
+
+    def test_regression_obj_zero_multipliers(self, plrx_zero):
+        """Regresión: obj = 34 100.0 con todos los multiplicadores a cero."""
+        _, obj = plrx_zero
+        assert obj == pytest.approx(34100.0, rel=1e-9)
+
+    def test_regression_x_j0_zero_multipliers(self, plrx_zero):
+        """Regresión: x[0,:] = [54, 9, 42, 4] (bins mínimos concentrados en j=0)."""
+        x, _ = plrx_zero
+        expected = np.array([54, 9, 42, 4])
+        assert np.array_equal(x[0, :], expected), (
+            f"x[0,:] = {x[0,:]} esperado {expected}"
+        )
+
+    def test_regression_obj_random_seed42(self, laguna):
+        """Regresión: obj con multiplicadores aleatorios (seed=42, escala 0.5/0.1)."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(42)
+        m = Multipliers(
+            mu=np.random.rand(n_j, n_k) * 0.5,
+            lbd=np.random.rand(n_j) * 0.1,
+            nu=np.random.rand(n_j, n_k) * 0.1,
+        )
+        _, obj = solve_plr_x(laguna, m)
+        assert obj == pytest.approx(27717.650706954864, rel=1e-9)
+
+    def test_regression_obj_random_seed7(self, laguna):
+        """Regresión: obj con multiplicadores aleatorios (seed=7, escala 0.3/0.1/0.05)."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(7)
+        m = Multipliers(
+            mu=np.random.rand(n_j, n_k) * 0.3,
+            lbd=np.random.rand(n_j) * 0.1,
+            nu=np.random.rand(n_j, n_k) * 0.05,
+        )
+        _, obj = solve_plr_x(laguna, m)
+        assert obj == pytest.approx(30218.736234042663, rel=1e-9)
+
+
+# ===========================================================================
+# 8. Tests de solve_plr_z
+# ===========================================================================
+
+@pytest.fixture(scope="module")
+def plrz_zero(laguna, mults_zero, vc) -> tuple[np.ndarray, float]:
+    """solve_plr_z con todos los multiplicadores a cero."""
+    return solve_plr_z(laguna, mults_zero, vc)
+
+
+class TestSolvePlrZ:
+    """
+    Tests para solve_plr_z — subproblema de apertura de puntos P_LR_z.
+
+    Formulación:
+        coef[j] = C_j - N_j · λ_j
+        z*  = arg min  Σ_j coef[j] · z_j
+              s.t.   Σ_{j ∈ vc[i][k]} z_j ≥ 1   ∀ (i,k) con vc[i][k] ≠ ∅
+                     z_j ∈ {0,1}
+        obj_plrz = Σ_j coef[j] · z[j]
+
+    Con multiplicadores a cero: coef[j] = C_j = 4000 ∀j → Gurobi minimiza
+    el número de candidatos abiertos (minimum set cover).
+
+    Instancia de referencia: instancia_laguna.json
+      · 740 edificios, 133 candidatos, 4 tipos de residuo
+      · opening_cost = 4000, max_bins = 8
+      · Mínimo set cover (mults=0) = 27 candidatos → obj = 108 000
+      · Candidatos forzados (únicos para algún (i,k)): j=51, j=73
+    """
+
+    # -----------------------------------------------------------------------
+    # 1. Shape correcta de z — (n_candidates,) dtype bool
+    # -----------------------------------------------------------------------
+
+    def test_z_shape(self, laguna, plrz_zero):
+        """z debe tener shape (n_candidates,)."""
+        z, _ = plrz_zero
+        assert z.shape == (laguna.n_candidates,), (
+            f"Shape inesperado: {z.shape}, esperado ({laguna.n_candidates},)"
+        )
+
+    def test_z_dtype_is_bool(self, plrz_zero):
+        """z debe ser de tipo bool (0/1 binario)."""
+        z, _ = plrz_zero
+        assert z.dtype == bool, f"z debe ser dtype=bool, obtenido {z.dtype}"
+
+    def test_obj_is_scalar_float(self, plrz_zero):
+        """obj_plrz debe ser un float escalar."""
+        _, obj = plrz_zero
+        assert isinstance(obj, float), f"obj_plrz debe ser float, obtenido {type(obj)}"
+        assert np.ndim(obj) == 0
+
+    # -----------------------------------------------------------------------
+    # 2. Restricción (23): cobertura completa de todos los (i,k) factibles
+    # -----------------------------------------------------------------------
+
+    def test_coverage_constraint_zero_multipliers(self, laguna, vc, plrz_zero):
+        """Para todo (i,k) con vc[i][k] ≠ ∅, any(z[j] for j in vc[i][k]) es True."""
+        z, _ = plrz_zero
+        for i in range(laguna.n_buildings):
+            for k in range(laguna.n_waste_types):
+                if vc[i][k]:
+                    assert any(z[j] for j in vc[i][k]), (
+                        f"Restricción (23) violada: (i={i},k={k}) sin candidato abierto, "
+                        f"vc={vc[i][k]}, z_vc={[bool(z[j]) for j in vc[i][k]]}"
+                    )
+
+    @pytest.mark.parametrize("seed", [42, 7, 99])
+    def test_coverage_constraint_random_multipliers(self, laguna, vc, seed):
+        """Restricción (23) se satisface para cualquier configuración de multiplicadores."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(seed)
+        lbd = np.random.rand(n_j) * 0.4   # coef[j] = 4000 - lbd*8 > 0 siempre
+        m = Multipliers(mu=np.zeros((n_j, n_k)), lbd=lbd, nu=np.zeros((n_j, n_k)))
+        z, _ = solve_plr_z(laguna, m, vc)
+        for i in range(laguna.n_buildings):
+            for k in range(n_k):
+                if vc[i][k]:
+                    assert any(z[j] for j in vc[i][k]), (
+                        f"seed={seed}: (i={i},k={k}) sin candidato abierto, "
+                        f"vc={vc[i][k]}"
+                    )
+
+    # -----------------------------------------------------------------------
+    # 3. Con mults=0, coef[j]=C_j ∀j → abre el mínimo número de candidatos
+    # -----------------------------------------------------------------------
+
+    def test_zero_multipliers_coefs_all_equal_opening_cost(self, laguna, mults_zero):
+        """coef[j] = opening_cost - 0·max_bins = opening_cost = 4000 para todo j."""
+        coef = laguna.params.opening_cost - mults_zero.lbd * laguna.params.max_bins
+        assert np.all(coef == laguna.params.opening_cost), (
+            f"Con lbd=0, todos los coefs deben ser {laguna.params.opening_cost}, "
+            f"min={coef.min():.2f}, max={coef.max():.2f}"
+        )
+
+    def test_zero_multipliers_minimum_candidates_opened(self, plrz_zero):
+        """Con coefs uniformes positivos, Gurobi resuelve el minimum set cover = 27."""
+        z, _ = plrz_zero
+        n_open = int(np.sum(z))
+        assert n_open == 27, (
+            f"Se esperaban 27 candidatos abiertos (mínimo set cover), obtenidos {n_open}"
+        )
+
+    def test_zero_multipliers_obj_equals_opening_cost_times_n_open(
+        self, laguna, plrz_zero
+    ):
+        """obj = C_j · n_open = 4000 · 27 = 108 000 con mults=0."""
+        z, obj = plrz_zero
+        n_open = int(np.sum(z))
+        expected = laguna.params.opening_cost * n_open
+        assert obj == pytest.approx(expected, rel=1e-9), (
+            f"Esperado {expected}, obtenido {obj}"
+        )
+
+    # -----------------------------------------------------------------------
+    # 4. obj_plrz = Σ_j coef[j] · z[j] — verificación manual del coeficiente
+    # -----------------------------------------------------------------------
+
+    def test_obj_equals_coef_dot_z_zero_multipliers(self, laguna, plrz_zero):
+        """Con mults=0: coef[j] = opening_cost → obj = opening_cost · Σ z[j]."""
+        z, obj = plrz_zero
+        coef = laguna.params.opening_cost * np.ones(laguna.n_candidates)
+        expected = float(np.sum(coef * z))
+        assert obj == pytest.approx(expected, rel=1e-9)
+
+    @pytest.mark.parametrize("seed", [42, 7])
+    def test_obj_equals_coef_dot_z_random_multipliers(self, laguna, vc, seed):
+        """obj = Σ_j (C_j - N_j·λ_j)·z[j] verificado manualmente (seed={seed})."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(seed)
+        lbd = np.random.rand(n_j) * 0.5
+        m = Multipliers(mu=np.zeros((n_j, n_k)), lbd=lbd, nu=np.zeros((n_j, n_k)))
+        z, obj = solve_plr_z(laguna, m, vc)
+        coef = laguna.params.opening_cost - lbd * laguna.params.max_bins
+        expected = float(np.sum(coef * z))
+        assert obj == pytest.approx(expected, rel=1e-9), (
+            f"seed={seed}: obj={obj:.6f}, recalculado={expected:.6f}"
+        )
+
+    # -----------------------------------------------------------------------
+    # 5. Con λ_j* muy grande, coef[j*] < 0 → z[j*] = True
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.parametrize("j_star", [0, 5, 50, 132])
+    def test_negative_coef_candidate_always_open(self, laguna, vc, j_star):
+        """λ[j*] = 501 → coef[j*] = 4000 - 501·8 = -8 < 0 → z[j*] debe ser True."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        lbd = np.zeros(n_j)
+        lbd[j_star] = 501.0   # coef = 4000 - 501*8 = -8 < 0
+        m = Multipliers(mu=np.zeros((n_j, n_k)), lbd=lbd, nu=np.zeros((n_j, n_k)))
+        z, _ = solve_plr_z(laguna, m, vc)
+        coef_jstar = laguna.params.opening_cost - lbd[j_star] * laguna.params.max_bins
+        assert coef_jstar < 0, (
+            f"Precondición: coef[{j_star}]={coef_jstar} debe ser negativo"
+        )
+        assert z[j_star] == True, (
+            f"j*={j_star} con coef={coef_jstar:.1f} < 0 debe estar abierto, "
+            f"z[j*]={z[j_star]}"
+        )
+
+    def test_all_negative_coefs_all_candidates_open(self, laguna, vc):
+        """Con λ_j = 501 ∀j (coef[j] = -8 ∀j), todos los 133 candidatos deben abrirse."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        lbd = np.full(n_j, 501.0)
+        m = Multipliers(mu=np.zeros((n_j, n_k)), lbd=lbd, nu=np.zeros((n_j, n_k)))
+        z, _ = solve_plr_z(laguna, m, vc)
+        assert np.all(z), (
+            f"Con todos los coefs negativos deben abrirse todos los candidatos; "
+            f"cerrados: {np.where(~z)[0].tolist()}"
+        )
+
+    # -----------------------------------------------------------------------
+    # 6. Sin candidatos abiertos "inútiles" (con coefs positivos)
+    # -----------------------------------------------------------------------
+
+    def test_no_useless_open_candidates_zero_multipliers(self, laguna, vc, plrz_zero):
+        """Con mults=0 (coefs > 0), todo j abierto cubre al menos un par (i,k)."""
+        z, _ = plrz_zero
+        n_k = laguna.n_waste_types
+        for j in range(laguna.n_candidates):
+            if z[j]:
+                covers = any(
+                    j in vc[i][k]
+                    for i in range(laguna.n_buildings)
+                    for k in range(n_k)
+                )
+                assert covers, (
+                    f"j={j} está abierto pero no cubre ningún par (i,k) — candidato inútil"
+                )
+
+    def test_every_open_candidate_uniquely_necessary(self, laguna, vc, plrz_zero):
+        """
+        Con coefs uniformes > 0 (minimum set cover), todo j abierto cubre al menos
+        un par (i,k) que ningún otro candidato abierto cubre.
+        Invariante de optimalidad: si j fuera redundante, retirarlo reduciría el coste.
+        """
+        z, _ = plrz_zero
+        open_set = set(int(j) for j in np.where(z)[0])
+        n_k = laguna.n_waste_types
+        for j in open_set:
+            uniquely_covers = any(
+                j in vc[i][k] and open_set.isdisjoint(set(vc[i][k]) - {j})
+                for i in range(laguna.n_buildings)
+                for k in range(n_k)
+            )
+            assert uniquely_covers, (
+                f"j={j} es redundante en el minimum set cover — "
+                f"ningún (i,k) depende exclusivamente de él"
+            )
+
+    # -----------------------------------------------------------------------
+    # 7. Número de candidatos abiertos razonable: 0 < n_open < n_candidates
+    # -----------------------------------------------------------------------
+
+    def test_n_open_positive_zero_multipliers(self, plrz_zero):
+        """Debe abrirse al menos 1 candidato."""
+        z, _ = plrz_zero
+        assert int(np.sum(z)) > 0, "n_open debe ser > 0"
+
+    def test_n_open_less_than_total_zero_multipliers(self, laguna, plrz_zero):
+        """Con coefs positivos, no es óptimo abrir todos los candidatos."""
+        z, _ = plrz_zero
+        n_open = int(np.sum(z))
+        assert n_open < laguna.n_candidates, (
+            f"No es razonable abrir todos los candidatos con coefs > 0: "
+            f"{n_open}/{laguna.n_candidates}"
+        )
+
+    @pytest.mark.parametrize("seed", [42, 7, 99])
+    def test_n_open_reasonable_random_positive_multipliers(self, laguna, vc, seed):
+        """Con lbd < 500 (coefs > 0), n_open está estrictamente entre 0 y n_j."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(seed)
+        lbd = np.random.rand(n_j) * 0.4   # coef min = 4000 - 0.4*8 = 3996.8 > 0
+        m = Multipliers(mu=np.zeros((n_j, n_k)), lbd=lbd, nu=np.zeros((n_j, n_k)))
+        z, _ = solve_plr_z(laguna, m, vc)
+        n_open = int(np.sum(z))
+        assert 0 < n_open < n_j, (
+            f"seed={seed}: n_open={n_open} debe estar en (0, {n_j})"
+        )
+
+    # -----------------------------------------------------------------------
+    # 8. Candidatos forzados (único válido para algún (i,k)) siempre abiertos
+    # -----------------------------------------------------------------------
+
+    def test_forced_candidates_open_zero_multipliers(self, laguna, vc, plrz_zero):
+        """j con |vc[i][k]|=1 para algún (i,k) debe aparecer en z — es ineludible."""
+        z, _ = plrz_zero
+        forced = {
+            j
+            for i in range(laguna.n_buildings)
+            for k in range(laguna.n_waste_types)
+            for j in vc[i][k]
+            if len(vc[i][k]) == 1
+        }
+        for j in forced:
+            assert z[j], (
+                f"j={j} es el único candidato para algún (i,k) pero no está abierto"
+            )
+
+    @pytest.mark.parametrize("j_forced,i_forced,k_forced", [
+        (51, 172, 0),   # j=51 único para (i=172, k=0) orgánico
+        (73, 362, 0),   # j=73 único para (i=362, k=0) orgánico
+    ])
+    def test_specific_forced_candidate_open(
+        self, laguna, vc, plrz_zero, j_forced, i_forced, k_forced
+    ):
+        """Regresión: j=51 y j=73 son los únicos candidatos para ciertos edificios."""
+        z, _ = plrz_zero
+        assert len(vc[i_forced][k_forced]) == 1, (
+            f"Precondición: (i={i_forced},k={k_forced}) debe tener exactamente 1 candidato"
+        )
+        assert vc[i_forced][k_forced][0] == j_forced, (
+            f"Precondición: único candidato de (i={i_forced},k={k_forced}) debe ser j={j_forced}"
+        )
+        assert z[j_forced], (
+            f"j={j_forced} único para (i={i_forced},k={k_forced}) → debe estar abierto"
+        )
+
+    @pytest.mark.parametrize("seed", [0, 42, 7])
+    def test_forced_candidates_open_with_random_multipliers(self, laguna, vc, seed):
+        """j con única cobertura está abierto independientemente de los multiplicadores."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(seed)
+        lbd = np.random.rand(n_j) * 0.4
+        m = Multipliers(mu=np.zeros((n_j, n_k)), lbd=lbd, nu=np.zeros((n_j, n_k)))
+        z, _ = solve_plr_z(laguna, m, vc)
+        forced = {
+            j
+            for i in range(laguna.n_buildings)
+            for k in range(n_k)
+            for j in vc[i][k]
+            if len(vc[i][k]) == 1
+        }
+        for j in forced:
+            assert z[j], (
+                f"seed={seed}: candidato forzado j={j} no está abierto"
+            )
+
+    # -----------------------------------------------------------------------
+    # 9. Regresión (valores fijados sobre instancia_laguna.json)
+    # -----------------------------------------------------------------------
+
+    def test_regression_obj_zero_multipliers(self, plrz_zero):
+        """Regresión: obj = 108 000.0 con todos los multiplicadores a cero."""
+        _, obj = plrz_zero
+        assert obj == pytest.approx(108_000.0, rel=1e-9)
+
+    def test_regression_n_open_zero_multipliers(self, plrz_zero):
+        """Regresión: minimum set cover sobre instancia Laguna = 27 candidatos."""
+        z, _ = plrz_zero
+        assert int(np.sum(z)) == 27
+
+    def test_regression_obj_seed42(self, laguna, vc):
+        """Regresión: obj con lbd ~ U(0, 0.5) (seed=42)."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(42)
+        lbd = np.random.rand(n_j) * 0.5
+        m = Multipliers(mu=np.zeros((n_j, n_k)), lbd=lbd, nu=np.zeros((n_j, n_k)))
+        _, obj = solve_plr_z(laguna, m, vc)
+        assert obj == pytest.approx(107_925.29823913104, rel=1e-9)
+
+    def test_regression_obj_seed7(self, laguna, vc):
+        """Regresión: obj con lbd ~ U(0, 0.3) (seed=7)."""
+        n_j, n_k = laguna.n_candidates, laguna.n_waste_types
+        np.random.seed(7)
+        lbd = np.random.rand(n_j) * 0.3
+        m = Multipliers(mu=np.zeros((n_j, n_k)), lbd=lbd, nu=np.zeros((n_j, n_k)))
+        _, obj = solve_plr_z(laguna, m, vc)
+        assert obj == pytest.approx(107_961.94154481686, rel=1e-9)
+
+
+# ===========================================================================
+# 9. Tests de repair_solution
+# ===========================================================================
+
+@pytest.fixture(scope="module")
+def z_from_plrz(plrz_zero) -> np.ndarray:
+    """z del minimum set cover (mults=0, 27 candidatos) — input para repair_solution."""
+    z, _ = plrz_zero
+    return z
+
+
+@pytest.fixture(scope="module")
+def repair_zero(laguna, z_from_plrz, vc) -> FeasibleSolution:
+    """
+    FeasibleSolution de repair_solution sobre z del minimum set cover.
+
+    Nota: el set cover mínimo abre solo 27 candidatos para 740 edificios y
+    4 tipos de residuo. Esto provoca que 7 candidatos excedan max_bins=8;
+    repair_solution emite UserWarning pero no restringe x. Los tests de
+    constraint (5) lo verifican explícitamente.
+    """
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        return repair_solution(laguna, z_from_plrz, vc)
+
+
+@pytest.fixture(scope="module")
+def repair_all_open(laguna, vc) -> FeasibleSolution:
+    """FeasibleSolution de repair_solution con todos los candidatos abiertos."""
+    z_all = np.ones(laguna.n_candidates, dtype=bool)
+    return repair_solution(laguna, z_all, vc)
+
+
+class TestRepairSolution:
+    """
+    Tests para repair_solution.
+
+    Invariantes del HDM que repair_solution debe garantizar:
+      (1)  Shapes y tipos correctos de z, x, y_assign, w, cost.
+      (2)  y_assign solo contiene índices de candidatos abiertos o -1 — nunca un
+           candidato cerrado.
+      (3)  Nearest-allocation: j asignado es el primero abierto en vc[i][k]
+           (verificado contra dij y valid_candidates).
+      (4)  Cobertura completa sobre la instancia Laguna (ningún y_assign[i,k]==-1).
+      (5)  Restricción capacidad (4): demanda asignada ≤ Q_k·x[j,k] para todo (j,k).
+      (6)  Restricción física (5): Σ_k x[j,k] ≤ max_bins, verificado con z_all;
+           cuando se viola (z escaso), repair_solution emite UserWarning.
+      (7)  w consistente con x: w[j,k] == (x[j,k] > 0) para todo (j,k).
+      (8)  Coste correcto: cost = Σ_j opening_cost·z[j] + Σ_{j,k} bin_cost[k]·x[j,k].
+      (9)  x[j,k] == 0 para todo j con z[j]=False — no hay contenedores en puntos
+           cerrados.
+      (10) Con z=all-True, y_assign[i,k] == vc[i][k][0] (el más cercano absoluto).
+
+    Instancia de referencia: instancia_laguna.json (740 edif., 133 cand., 4 tipos)
+      · z del minimum set cover (mults=0): 27 candidatos, cost=168 000 €
+      · 7 candidatos superan max_bins=8 con ese z (j=6,10,17,19,24,28,56)
+      · Con z=all-True: ningún candidato supera max_bins, cost=683 900 €
+    """
+
+    # -----------------------------------------------------------------------
+    # Helper estático
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def _demand_at(instance, y_assign: np.ndarray) -> np.ndarray:
+        """Recalcula demand_at[j,k] desde y_assign para verificar invariantes."""
+        n_j = len(instance.J)
+        n_k = len(instance.K)
+        da = np.zeros((n_j, n_k))
+        for i in range(len(instance.I)):
+            for k in range(n_k):
+                j = y_assign[i, k]
+                if j != -1:
+                    da[j, k] += compute_demand(instance.I[i].h_i, instance.params, k)
+        return da
+
+    # -----------------------------------------------------------------------
+    # 1. Shapes y tipos correctos
+    # -----------------------------------------------------------------------
+
+    def test_z_shape(self, laguna, repair_zero):
+        """z debe tener shape (n_candidates,)."""
+        assert repair_zero.z.shape == (laguna.n_candidates,), (
+            f"z shape: esperado ({laguna.n_candidates},), obtenido {repair_zero.z.shape}"
+        )
+
+    def test_x_shape(self, laguna, repair_zero):
+        """x debe tener shape (n_candidates, n_waste_types)."""
+        assert repair_zero.x.shape == (laguna.n_candidates, laguna.n_waste_types), (
+            f"x shape: esperado ({laguna.n_candidates},{laguna.n_waste_types}), "
+            f"obtenido {repair_zero.x.shape}"
+        )
+
+    def test_y_assign_shape(self, laguna, repair_zero):
+        """y_assign debe tener shape (n_buildings, n_waste_types)."""
+        assert repair_zero.y_assign.shape == (laguna.n_buildings, laguna.n_waste_types), (
+            f"y_assign shape: esperado ({laguna.n_buildings},{laguna.n_waste_types}), "
+            f"obtenido {repair_zero.y_assign.shape}"
+        )
+
+    def test_w_shape(self, laguna, repair_zero):
+        """w debe tener shape (n_candidates, n_waste_types)."""
+        assert repair_zero.w.shape == (laguna.n_candidates, laguna.n_waste_types), (
+            f"w shape: esperado ({laguna.n_candidates},{laguna.n_waste_types}), "
+            f"obtenido {repair_zero.w.shape}"
+        )
+
+    def test_z_dtype_bool(self, repair_zero):
+        """z debe ser dtype=bool."""
+        assert repair_zero.z.dtype == bool, (
+            f"z debe ser bool, obtenido {repair_zero.z.dtype}"
+        )
+
+    def test_x_dtype_integer(self, repair_zero):
+        """x debe ser dtype entero (número de contenedores)."""
+        assert np.issubdtype(repair_zero.x.dtype, np.integer), (
+            f"x debe ser entero, obtenido {repair_zero.x.dtype}"
+        )
+
+    def test_y_assign_dtype_integer(self, repair_zero):
+        """y_assign debe ser dtype entero (índice de candidato o -1)."""
+        assert np.issubdtype(repair_zero.y_assign.dtype, np.integer), (
+            f"y_assign debe ser entero, obtenido {repair_zero.y_assign.dtype}"
+        )
+
+    def test_w_dtype_bool(self, repair_zero):
+        """w debe ser dtype=bool."""
+        assert repair_zero.w.dtype == bool, (
+            f"w debe ser bool, obtenido {repair_zero.w.dtype}"
+        )
+
+    def test_cost_is_float(self, repair_zero):
+        """cost debe ser un float (o compatible)."""
+        assert isinstance(repair_zero.cost, (float, np.floating)), (
+            f"cost debe ser float, obtenido {type(repair_zero.cost)}"
+        )
+
+    def test_x_non_negative(self, repair_zero):
+        """x ≥ 0 para todo (j,k) — no hay contenedores negativos."""
+        assert np.all(repair_zero.x >= 0), (
+            f"x tiene valores negativos: min={repair_zero.x.min()}"
+        )
+
+    # -----------------------------------------------------------------------
+    # 2. y_assign solo contiene candidatos abiertos o -1
+    # -----------------------------------------------------------------------
+
+    def test_y_assign_only_open_or_minus1(self, repair_zero):
+        """y_assign[i,k] debe ser -1 o un j con z[j]=True."""
+        ya = repair_zero.y_assign
+        z = repair_zero.z
+        n_i, n_k = ya.shape
+        for i in range(n_i):
+            for k in range(n_k):
+                j = int(ya[i, k])
+                if j != -1:
+                    assert z[j], (
+                        f"y_assign[{i},{k}]={j} apunta a candidato cerrado (z[{j}]=False)"
+                    )
+
+    def test_y_assign_never_points_to_closed_candidate_vectorized(self, repair_zero):
+        """Verificación vectorizada: ningún y_assign apunta a un candidato cerrado."""
+        ya = repair_zero.y_assign
+        z = repair_zero.z
+        assigned = ya[ya != -1].astype(int)
+        closed_set = set(int(j) for j in np.where(~z)[0])
+        violations = [int(j) for j in assigned if j in closed_set]
+        assert not violations, (
+            f"y_assign apunta a {len(violations)} candidatos cerrados "
+            f"(muestra): {violations[:5]}"
+        )
+
+    def test_y_assign_valid_range(self, laguna, repair_zero):
+        """Índices en y_assign ∈ [0, n_candidates) o -1."""
+        ya = repair_zero.y_assign
+        n_j = laguna.n_candidates
+        assigned = ya[ya != -1]
+        assert np.all(assigned >= 0), "y_assign tiene valores negativos distintos de -1"
+        assert np.all(assigned < n_j), (
+            f"y_assign tiene índices ≥ n_candidates={n_j}: max={assigned.max()}"
+        )
+
+    # -----------------------------------------------------------------------
+    # 3. Nearest-allocation: j asignado es el más cercano ABIERTO
+    # -----------------------------------------------------------------------
+
+    def test_nearest_allocation_matches_first_open_in_vc(self, laguna, vc, repair_zero):
+        """y_assign[i,k] == primer j en vc[i][k] con z[j]=True."""
+        ya = repair_zero.y_assign
+        z = repair_zero.z
+        for i in range(laguna.n_buildings):
+            for k in range(laguna.n_waste_types):
+                expected = -1
+                for j in vc[i][k]:
+                    if z[j]:
+                        expected = j
+                        break
+                assert int(ya[i, k]) == expected, (
+                    f"(i={i},k={k}): y_assign={ya[i,k]}, primer abierto en vc={expected}"
+                )
+
+    def test_nearest_allocation_distance_is_minimum_among_open(
+        self, laguna, vc, repair_zero
+    ):
+        """
+        La distancia al j asignado es ≤ a la de cualquier otro candidato abierto
+        en vc[i][k] — nearest-allocation exhaustiva verificada contra dij.
+        """
+        ya = repair_zero.y_assign
+        z = repair_zero.z
+        for i in range(laguna.n_buildings):
+            for k in range(laguna.n_waste_types):
+                j = int(ya[i, k])
+                if j == -1:
+                    continue
+                d_assigned = laguna.dij[j][i]
+                for j2 in vc[i][k]:
+                    if z[j2] and j2 != j:
+                        d2 = laguna.dij[j2][i]
+                        assert d_assigned <= d2 + 1e-9, (
+                            f"(i={i},k={k}): asignado j={j} d={d_assigned:.4f} > "
+                            f"abierto j2={j2} d2={d2:.4f} — no es el más cercano"
+                        )
+
+    def test_nearest_allocation_candidate_is_valid_for_ik(
+        self, laguna, vc, repair_zero
+    ):
+        """El j asignado siempre pertenece a valid_candidates[i][k]."""
+        ya = repair_zero.y_assign
+        for i in range(laguna.n_buildings):
+            for k in range(laguna.n_waste_types):
+                j = int(ya[i, k])
+                if j == -1:
+                    continue
+                vc_set = set(vc[i][k])
+                assert j in vc_set, (
+                    f"(i={i},k={k}): j={j} asignado no está en valid_candidates"
+                )
+
+    def test_y_minus1_iff_no_open_candidate_in_vc(self, laguna, vc, repair_zero):
+        """y_assign[i,k]==-1 ↔ no hay ningún candidato abierto en vc[i][k]."""
+        ya = repair_zero.y_assign
+        z = repair_zero.z
+        for i in range(laguna.n_buildings):
+            for k in range(laguna.n_waste_types):
+                has_open = any(z[j] for j in vc[i][k])
+                is_minus1 = (int(ya[i, k]) == -1)
+                assert is_minus1 != has_open, (
+                    f"(i={i},k={k}): y=-1={is_minus1} pero has_open={has_open} — inconsistente"
+                )
+
+    # -----------------------------------------------------------------------
+    # 4. Cobertura completa (ningún -1 en la instancia Laguna)
+    # -----------------------------------------------------------------------
+
+    def test_full_coverage_no_minus1(self, repair_zero):
+        """En la instancia Laguna con z=minimum set cover, cobertura al 100%."""
+        n_minus1 = int(np.sum(repair_zero.y_assign == -1))
+        assert n_minus1 == 0, (
+            f"{n_minus1} pares (i,k) sin asignación — se esperaba cobertura completa"
+        )
+
+    def test_full_coverage_per_waste_type(self, laguna, repair_zero):
+        """Ningún tipo de residuo tiene edificios sin asignación."""
+        ya = repair_zero.y_assign
+        for k in range(laguna.n_waste_types):
+            unassigned = int(np.sum(ya[:, k] == -1))
+            assert unassigned == 0, (
+                f"k={k}: {unassigned} edificios sin asignación"
+            )
+
+    def test_full_coverage_all_buildings_have_j_for_all_k(self, laguna, repair_zero):
+        """Cada edificio tiene asignación para los 4 tipos de residuo."""
+        ya = repair_zero.y_assign
+        for i in range(laguna.n_buildings):
+            unassigned = int(np.sum(ya[i, :] == -1))
+            assert unassigned == 0, (
+                f"edificio {i}: {unassigned} tipos sin asignación"
+            )
+
+    # -----------------------------------------------------------------------
+    # 5. Restricción (4) capacidad: demanda ≤ Q_k · x[j,k]
+    # -----------------------------------------------------------------------
+
+    def test_capacity_constraint_per_candidate_and_type(self, laguna, repair_zero):
+        """Para todo (j,k), la demanda asignada no supera Q_k·x[j,k]."""
+        demand_at = self._demand_at(laguna, repair_zero.y_assign)
+        x = repair_zero.x
+        bin_cap = np.array([laguna.params.bin_capacity[k] for k in laguna.K])
+        for j in range(laguna.n_candidates):
+            for k in range(laguna.n_waste_types):
+                cap = float(x[j, k]) * bin_cap[k]
+                dem = demand_at[j, k]
+                assert dem <= cap + 1e-9, (
+                    f"j={j} k={k}: demanda={dem:.4f} > capacidad={cap:.4f} "
+                    f"(x[j,k]={x[j,k]}, Q_k={bin_cap[k]})"
+                )
+
+    def test_capacity_constraint_vectorized(self, laguna, repair_zero):
+        """Vectorizado: demand_at ≤ x·Q_k para todo (j,k) — sin excepciones."""
+        demand_at = self._demand_at(laguna, repair_zero.y_assign)
+        x = repair_zero.x
+        bin_cap = np.array([laguna.params.bin_capacity[k] for k in laguna.K])
+        surplus = x * bin_cap - demand_at
+        violations = list(zip(*np.where(surplus < -1e-9)))
+        assert not violations, (
+            f"{len(violations)} pares (j,k) violan la capacidad: "
+            f"primeros 5 = {violations[:5]}"
+        )
+
+    def test_x_equals_ceil_demand_over_capacity(self, laguna, repair_zero):
+        """x[j,k] == ceil(demand_at[j,k] / Q_k) cuando demand_at[j,k] > 0."""
+        import math
+        demand_at = self._demand_at(laguna, repair_zero.y_assign)
+        x = repair_zero.x
+        bin_cap = np.array([laguna.params.bin_capacity[k] for k in laguna.K])
+        for j in range(laguna.n_candidates):
+            for k in range(laguna.n_waste_types):
+                if demand_at[j, k] > 0:
+                    expected = math.ceil(demand_at[j, k] / bin_cap[k])
+                    assert int(x[j, k]) == expected, (
+                        f"x[{j},{k}]={x[j,k]}, ceil(demand/Q)={expected}, "
+                        f"demand={demand_at[j,k]:.6f}, Q={bin_cap[k]}"
+                    )
+
+    def test_x_zero_where_no_demand(self, laguna, repair_zero):
+        """x[j,k] == 0 cuando ningún edificio está asignado a (j,k)."""
+        demand_at = self._demand_at(laguna, repair_zero.y_assign)
+        x = repair_zero.x
+        no_demand_mask = demand_at == 0.0
+        assert np.all(x[no_demand_mask] == 0), (
+            f"x>0 donde demand=0 en {int(np.sum(x[no_demand_mask] > 0))} posiciones"
+        )
+
+    # -----------------------------------------------------------------------
+    # 6. Restricción (5) límite físico: Σ_k x[j,k] ≤ max_bins
+    #    Con z escaso (27 cand.), repair_solution emite UserWarning para los
+    #    candidatos que se sobrecargan. Con z=all-True (133 cand.), se satisface.
+    # -----------------------------------------------------------------------
+
+    def test_physical_limit_violated_emits_user_warning(
+        self, laguna, z_from_plrz, vc
+    ):
+        """
+        Con z del minimum set cover (27 candidatos), 7 de ellos superan max_bins=8;
+        repair_solution debe emitir UserWarning por cada uno de ellos.
+        """
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            repair_solution(laguna, z_from_plrz, vc)
+        bin_warns = [w for w in caught if issubclass(w.category, UserWarning)]
+        assert len(bin_warns) > 0, (
+            "Se esperaban UserWarning por candidatos con demasiados bins, "
+            "pero no se emitió ninguno"
+        )
+
+    def test_physical_limit_exactly_7_warnings_minimum_set_cover(
+        self, laguna, z_from_plrz, vc
+    ):
+        """Regresión: exactamente 7 candidatos violan max_bins=8 con z del set cover."""
+        import warnings
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            repair_solution(laguna, z_from_plrz, vc)
+        n_warns = sum(1 for w in caught if issubclass(w.category, UserWarning))
+        assert n_warns == 7, (
+            f"Se esperaban 7 warnings de exceso de bins, obtenidos {n_warns}"
+        )
+
+    def test_physical_limit_known_violating_candidates(
+        self, laguna, z_from_plrz, vc
+    ):
+        """Regresión: los candidatos j=6,10,17,19,24,28,56 superan max_bins con z escaso."""
+        import warnings
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("ignore")
+            fs = repair_solution(laguna, z_from_plrz, vc)
+        known = {6, 10, 17, 19, 24, 28, 56}
+        for j in known:
+            total = int(np.sum(fs.x[j, :]))
+            assert total > laguna.params.max_bins, (
+                f"j={j} debería superar max_bins={laguna.params.max_bins}, "
+                f"obtenido total={total}"
+            )
+
+    def test_physical_limit_satisfied_all_open(self, laguna, repair_all_open):
+        """Con todos los candidatos abiertos, ningún j supera max_bins=8."""
+        x = repair_all_open.x
+        max_bins = laguna.params.max_bins
+        totals = np.sum(x, axis=1)
+        violations = np.where(totals > max_bins)[0]
+        assert len(violations) == 0, (
+            f"{len(violations)} candidatos superan max_bins={max_bins} con z=all-True: "
+            f"{violations.tolist()}"
+        )
+
+    def test_physical_limit_all_open_max_is_bounded(self, laguna, repair_all_open):
+        """Con z=all-True, el máximo de bins por candidato es exactamente max_bins."""
+        x = repair_all_open.x
+        max_total = int(np.max(np.sum(x, axis=1)))
+        assert max_total <= laguna.params.max_bins, (
+            f"max total bins per candidate={max_total} > max_bins={laguna.params.max_bins}"
+        )
+
+    # -----------------------------------------------------------------------
+    # 7. w consistente con x: w[j,k] == (x[j,k] > 0)
+    # -----------------------------------------------------------------------
+
+    def test_w_consistent_with_x_exactly(self, repair_zero):
+        """w == (x > 0) elemento a elemento — identidad exacta."""
+        w = repair_zero.w
+        x = repair_zero.x
+        expected = (x > 0)
+        n_diff = int(np.sum(w != expected))
+        assert n_diff == 0, (
+            f"w y (x > 0) difieren en {n_diff} posiciones"
+        )
+
+    def test_w_false_implies_x_zero(self, repair_zero):
+        """w[j,k]=False → x[j,k]=0 sin excepciones."""
+        w = repair_zero.w
+        x = repair_zero.x
+        n_viol = int(np.sum(x[~w] > 0))
+        assert n_viol == 0, (
+            f"x tiene {n_viol} valores >0 donde w=False"
+        )
+
+    def test_w_true_implies_x_positive(self, repair_zero):
+        """w[j,k]=True → x[j,k]>0 sin excepciones."""
+        w = repair_zero.w
+        x = repair_zero.x
+        n_viol = int(np.sum(x[w] == 0))
+        assert n_viol == 0, (
+            f"x tiene {n_viol} ceros donde w=True"
+        )
+
+    def test_w_consistent_all_open(self, repair_all_open):
+        """w == (x > 0) también con z=all-True."""
+        assert np.array_equal(repair_all_open.w, (repair_all_open.x > 0)), (
+            "w y (x > 0) difieren con z=all-True"
+        )
+
+    # -----------------------------------------------------------------------
+    # 8. Coste correcto: cost = Σ opening_cost·z + Σ bin_cost[k]·x[j,k]
+    # -----------------------------------------------------------------------
+
+    def test_cost_equals_fixed_plus_variable(self, laguna, repair_zero):
+        """cost = Σ_j opening_cost·z[j] + Σ_{j,k} bin_cost[k]·x[j,k]."""
+        z = repair_zero.z
+        x = repair_zero.x
+        fixed = float(np.sum(z) * laguna.params.opening_cost)
+        bin_cost = np.array([laguna.params.bin_cost[k] for k in laguna.K])
+        variable = float(np.sum(x * bin_cost))
+        expected = fixed + variable
+        assert repair_zero.cost == pytest.approx(expected, rel=1e-9), (
+            f"cost={repair_zero.cost:.4f}, esperado={expected:.4f} "
+            f"(fixed={fixed:.2f}, variable={variable:.2f})"
+        )
+
+    def test_cost_fixed_part_proportional_to_n_open(self, laguna, repair_zero):
+        """La parte fija del coste == opening_cost × n_open."""
+        z = repair_zero.z
+        n_open = int(np.sum(z))
+        bin_cost = np.array([laguna.params.bin_cost[k] for k in laguna.K])
+        variable = float(np.sum(repair_zero.x * bin_cost))
+        expected = n_open * laguna.params.opening_cost + variable
+        assert repair_zero.cost == pytest.approx(expected, rel=1e-9)
+
+    def test_cost_positive(self, repair_zero):
+        """El coste de cualquier solución con al menos un candidato abierto > 0."""
+        assert repair_zero.cost > 0.0, f"cost={repair_zero.cost} debe ser > 0"
+
+    def test_regression_cost_minimum_set_cover(self, repair_zero):
+        """Regresión: cost = 168 000 € con z del minimum set cover (27 candidatos)."""
+        assert repair_zero.cost == pytest.approx(168_000.0, rel=1e-9), (
+            f"cost={repair_zero.cost}, esperado=168 000.0"
+        )
+
+    def test_regression_cost_all_open(self, repair_all_open):
+        """Regresión: cost = 683 900 € con todos los 133 candidatos abiertos."""
+        assert repair_all_open.cost == pytest.approx(683_900.0, rel=1e-9), (
+            f"cost={repair_all_open.cost}, esperado=683 900.0"
+        )
+
+    # -----------------------------------------------------------------------
+    # 9. x[j,k] == 0 para candidatos cerrados
+    # -----------------------------------------------------------------------
+
+    def test_no_bins_at_closed_candidates(self, repair_zero):
+        """x[j,k] == 0 para todo j con z[j]=False."""
+        z = repair_zero.z
+        x = repair_zero.x
+        n_viol = int(np.sum(x[~z] > 0))
+        assert n_viol == 0, (
+            f"{n_viol} bins asignados a candidatos cerrados"
+        )
+
+    def test_no_bins_at_closed_per_waste_type(self, laguna, repair_zero):
+        """Para cada k, x[j,k] == 0 en todos los candidatos cerrados."""
+        z = repair_zero.z
+        x = repair_zero.x
+        for k in range(laguna.n_waste_types):
+            n_viol = int(np.sum(x[~z, k] > 0))
+            assert n_viol == 0, (
+                f"k={k}: {n_viol} candidatos cerrados con x[j,{k}] > 0"
+            )
+
+    def test_w_false_at_all_closed_candidates(self, repair_zero):
+        """w[j,k]=False para todo j con z[j]=False — coherente con x=0."""
+        z = repair_zero.z
+        w = repair_zero.w
+        n_viol = int(np.sum(w[~z]))
+        assert n_viol == 0, (
+            f"{n_viol} posiciones (j,k) con j cerrado tienen w=True"
+        )
+
+    def test_no_bins_at_closed_candidates_all_open_trivially(self, repair_all_open):
+        """Con z=all-True no hay candidatos cerrados — x puede ser no nulo en todos."""
+        z = repair_all_open.z
+        assert np.all(z), "Precondición: z=all-True debe tener todos True"
+        # Verificación de coherencia: x >= 0 en todos los puntos
+        assert np.all(repair_all_open.x >= 0)
+
+    # -----------------------------------------------------------------------
+    # 10. Con z=all-True, y_assign coincide con valid_candidates[i][k][0]
+    # -----------------------------------------------------------------------
+
+    def test_all_open_assigns_nearest_absolute(self, laguna, vc, repair_all_open):
+        """
+        Con todos los candidatos abiertos, el más cercano abierto es vc[i][k][0]
+        (el más cercano absoluto). y_assign[i,k] debe igualar vc[i][k][0].
+        """
+        ya = repair_all_open.y_assign
+        for i in range(laguna.n_buildings):
+            for k in range(laguna.n_waste_types):
+                if vc[i][k]:
+                    assert int(ya[i, k]) == vc[i][k][0], (
+                        f"(i={i},k={k}): y_assign={ya[i,k]}, "
+                        f"vc[i][k][0]={vc[i][k][0]}"
+                    )
+
+    def test_all_open_distance_is_global_minimum_in_dij(
+        self, laguna, vc, repair_all_open
+    ):
+        """
+        Con z=all-True, la distancia al j asignado es la mínima en vc[i][k]
+        (orden ASC garantizado por precompute_valid_candidates).
+        """
+        ya = repair_all_open.y_assign
+        for i in range(laguna.n_buildings):
+            for k in range(laguna.n_waste_types):
+                j = int(ya[i, k])
+                if j == -1:
+                    continue
+                d_assigned = laguna.dij[j][i]
+                for j2 in vc[i][k]:
+                    d2 = laguna.dij[j2][i]
+                    assert d_assigned <= d2 + 1e-9, (
+                        f"(i={i},k={k}): d={d_assigned:.4f} > d(j2={j2})={d2:.4f} "
+                        f"— no es el mínimo global en dij"
+                    )
+
+    def test_all_open_full_coverage(self, laguna, repair_all_open):
+        """Con z=all-True sobre instancia Laguna, cobertura = 100% (cero -1)."""
+        n_minus1 = int(np.sum(repair_all_open.y_assign == -1))
+        assert n_minus1 == 0, (
+            f"{n_minus1} pares (i,k) sin asignación con z=all-True"
+        )
+
+    def test_all_open_y_assign_in_range(self, laguna, repair_all_open):
+        """Con z=all-True, y_assign tiene solo índices en [0, n_candidates)."""
+        ya = repair_all_open.y_assign
+        n_j = laguna.n_candidates
+        assert np.all(ya >= 0), "z=all-True: y_assign tiene -1 inesperado"
+        assert np.all(ya < n_j), (
+            f"z=all-True: y_assign tiene índices ≥ n_candidates={n_j}"
+        )
+
+    def test_all_open_no_mismatch_with_vc_first(self, laguna, vc, repair_all_open):
+        """Regresión: 0 discrepancias entre y_assign y vc[i][k][0] con z=all-True."""
+        ya = repair_all_open.y_assign
+        mismatches = sum(
+            1
+            for i in range(laguna.n_buildings)
+            for k in range(laguna.n_waste_types)
+            if vc[i][k] and int(ya[i, k]) != vc[i][k][0]
+        )
+        assert mismatches == 0, (
+            f"{mismatches} discrepancias entre y_assign y vc[i][k][0] con z=all-True"
+        )

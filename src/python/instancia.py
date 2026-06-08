@@ -9,6 +9,8 @@ References:
     Boeing (2025). Geographical Analysis 57, 567-577.
 """
 
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass
 from typing import Any
