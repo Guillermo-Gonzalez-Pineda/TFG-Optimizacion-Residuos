@@ -180,11 +180,48 @@ if __name__ == "__main__":
 
     # ── Guardar solución para análisis posterior ──────────
     if result["cost"] is not None:
-        import pickle
-        
-        sol_path = "output/solucion_exacta.pkl"
-        with open(sol_path, "wb") as f:
+        import pickle, json
+
+        os.makedirs("output", exist_ok=True)
+
+        # 1. Pickle completo (preserva claves tupla)
+        pkl_path = "output/solucion_exacta.pkl"
+        with open(pkl_path, "wb") as f:
             pickle.dump(result, f)
-        print(f"  Solution saved: {sol_path}")
+
+        # 2. Verificar que se guardó correctamente
+        with open(pkl_path, "rb") as f:
+            check = pickle.load(f)
+        assert check["cost"] == result["cost"], "ERROR: pickle corrupto"
+        assert len(check["y_assign"]) == len(result["y_assign"]), "ERROR: asignaciones perdidas"
+
+        # 3. Resumen legible en JSON (backup sin claves tupla)
+        json_path = "output/solucion_exacta_resumen.json"
+        resumen = {
+            "cost": result["cost"],
+            "gap_gurobi": result["gap_gurobi"],
+            "runtime": result["runtime"],
+            "status": result["status"],
+            "n_points_open": sum(result["z"].values()),
+            "total_bins": sum(result["x"].values()),
+            "bins_per_type": {
+                k: sum(v for (j, kk), v in result["x"].items() if kk == k)
+                for k in range(inst.n_waste_types)
+            },
+            "open_points": [j for j, v in result["z"].items() if v == 1],
+        }
+        with open(json_path, "w") as f:
+            json.dump(resumen, f, indent=2)
+
+        print(f"  ✅ Pickle guardado y verificado: {pkl_path}")
+        print(f"  ✅ Resumen JSON:                 {json_path}")
+        print(f"     Contenido del pickle:")
+        print(f"       z:        {len(result['z'])} entries")
+        print(f"       x:        {len(result['x'])} entries")
+        print(f"       w:        {len(result['w'])} entries")
+        print(f"       y_assign: {len(result['y_assign'])} entries")
+    else:
+        print("  ⚠️  No solution to save.")
+
     print("=" * 65)
 
