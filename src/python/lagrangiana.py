@@ -8,6 +8,7 @@ import warnings
 
 import numpy as np
 import gurobipy as gp
+from gurobipy import GRB
 from dataclasses import dataclass
 
 from instancia import Instance, ModelParameters,compute_demand
@@ -135,7 +136,7 @@ def solve_plr_yw(
 
             
 
-def solve_plr_x(
+def solve_plr_x_greedy(
     instance: Instance,
     multipliers: Multipliers,
 ) -> tuple[np.ndarray, float]:
@@ -202,6 +203,84 @@ def solve_plr_x(
 
     return x, obj_plrx
 
+
+def solve_plr_x(
+    instance: Instance,
+    multipliers: Multipliers,
+) -> tuple[np.ndarray, float]:
+    """
+    Solve P_LR_x with Gurobi (exact).
+    Returns x (n_j x n_k) and objective value.
+    """
+
+    # ── BLOQUE 1: Extraer dimensiones ────────────────────
+    n_candidates = len(instance.J)
+    n_waste_types = len(instance.K)
+    n_buildings = len(instance.I)
+
+    # ── BLOQUE 2: Calcular demanda total por tipo ────────
+    total_demand = np.zeros(n_waste_types)
+    for i_idx in range(n_buildings):
+        for k in range(n_waste_types):
+            total_demand[k] += compute_demand(instance.I[i_idx].h_i, instance.params, k)
+
+    # ── BLOQUE 3: Calcular coeficientes residuos  ───────
+    # bin_cost_array[k] = c_k -> dimensión (n_k,)
+    bin_cost_arr = np.array([instance.params.bin_cost[k] for k in instance.K])
+
+    # bin_cap_arr[k] = capacity of bin type k (Q_k)
+    bin_cap_arr = np.array([instance.params.bin_capacity[k] for k in instance.K])
+
+    # coef[j, k] = c_k + lambda_j + nu_jk - mu_jk * Q_k - dimension (n_j, n_k)
+    coef = (bin_cost_arr 
+            + multipliers.lbd[:, np.newaxis] 
+            + multipliers.nu 
+            - multipliers.mu * bin_cap_arr)
+    
+    # ── BLOQUE 4: Construir modelo Gurobi ───────────────
+    # crear modelo silencioso
+    model = gp.Model("P_LR_x")
+    model.Params.OutputFlag = 0
+    model.Params.Threads    = 1
+
+    # variables x[j, k] enteras no negativas
+    x = model.addVars(n_candidates, n_waste_types,
+                       vtype=GRB.INTEGER, lb=0, ub=instance.params.max_bins, name="x")
+
+    # objetivo: min Σⱼ Σₖ coef[j,k] · x[j,k]
+    model.setObjective(
+        gp.quicksum(coef[j, k] * x[j, k] for j in range(n_candidates) for k in range(n_waste_types)),
+        sense=GRB.MINIMIZE
+    )
+
+    # restricción (26): Σⱼ Q_k · x[j,k] ≥ D_k,  ∀k
+    for k in range(n_waste_types):
+        model.addConstr(
+            gp.quicksum(x[j, k] * bin_cap_arr[k] for j in range(n_candidates)) >= total_demand[k]
+        )
+
+    # desigualdad válida: Σₖ x[j,k] ≤ N_j,       ∀j
+    for j in range(n_candidates):
+        model.addConstr(
+            gp.quicksum(x[j, k] for k in range(n_waste_types)) <= instance.params.max_bins
+        )
+    
+
+    # ── BLOQUE 5: Resolver y extraer ─────────────────────
+    model.optimize()
+
+    # verificar status == OPTIMAL
+    if model.Status != GRB.OPTIMAL:
+        raise ValueError(f"Gurobi no encontró solución óptima para P_LR_x (status {model.Status})")
+    
+    x_sol = np.zeros((n_candidates, n_waste_types), dtype=int)
+    for j in range(n_candidates):
+        for k in range(n_waste_types):
+            x_sol[j, k] = int(round(x[j, k].X))
+    obj_plrx = model.ObjVal
+
+    return x_sol, obj_plrx
+    
 
 
 def solve_plr_z(
