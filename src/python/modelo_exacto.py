@@ -177,5 +177,14 @@ if __name__ == "__main__":
         print(f"  Total bins:    {total_bins}")
     else:
         print(f"  No solution found. Status: {result['status']}")
+
+    # ── Guardar solución para análisis posterior ──────────
+    if result["cost"] is not None:
+        import pickle
+        
+        sol_path = "output/solucion_exacta.pkl"
+        with open(sol_path, "wb") as f:
+            pickle.dump(result, f)
+        print(f"  Solution saved: {sol_path}")
     print("=" * 65)
 

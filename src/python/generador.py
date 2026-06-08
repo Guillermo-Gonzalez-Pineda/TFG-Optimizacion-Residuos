@@ -509,7 +509,7 @@ if __name__ == "__main__":
     params = ModelParameters(
         opening_cost=4000.0,
         max_bins=8,
-        nimby_distance=10.0,
+        nimby_distance=0.0,
         waste_per_capita=1.32,
         overflow_penalty=500.0,
         bin_cost={0: 350.0, 1: 300.0, 2: 250.0, 3: 500.0},
