@@ -1,58 +1,62 @@
-# Dependencies
-node_modules/
+# ============================================================
+# ENTORNO PYTHON
+# ============================================================
+venv/
+.venv/
+env/
 __pycache__/
 *.pyc
 *.pyo
-venv/
-env/
+*.pyd
+*.egg-info/
 
-# IDE
+# ============================================================
+# JUPYTER
+# ============================================================
+.ipynb_checkpoints/
+
+# ============================================================
+# CACHÉ DE OSMnx / APIs (se regeneran automáticamente)
+# ============================================================
+cache/
+**/cache/
+
+# ============================================================
+# DATOS — Ajusta según lo que SÍ quieras versionar
+# ============================================================
+# Datos crudos pesados (descomenta si no quieres versionar)
+# data/raw/
+
+# Formatos geoespaciales pesados
+*.gpkg
+*.geojson
+
+# Datos procesados intermedios (opcional — decide tú)
+# data/processed/
+
+# ============================================================
+# OPTIMIZACIÓN (Gurobi, CPLEX)
+# ============================================================
+*.lp
+*.mps
+*.sol
+*.ilp
+
+# ============================================================
+# IDE Y SISTEMA
+# ============================================================
 .vscode/
 .idea/
+.DS_Store
+Thumbs.db
 *.swp
 *.swo
 *~
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Build
-dist/
-build/
-*.egg-info/
-
-# Environment
+# ============================================================
+# LOGS Y VARIABLES DE ENTORNO
+# ============================================================
+*.log
 .env
 .env.local
-
-# Logs
-*.log
 npm-debug.log*
-
-# Cache
-.cache/
-.pytest_cache/
-
-# Entorno virtual
-venv/
-.venv/
-env/
-
-# Jupyter
-.ipynb_checkpoints/
-*.pyc
-__pycache__/
-
-# Datos intermedios (ajusta según tu proyecto)
-data/raw/
-*.gpkg
-*.geojson
-
-# Gurobi
-*.lp
-*.mps
-
-# Sistema
-.DS_Store
-*.log
