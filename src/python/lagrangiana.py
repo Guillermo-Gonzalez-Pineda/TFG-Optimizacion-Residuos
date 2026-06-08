@@ -382,16 +382,91 @@ def repair_solution(
         for k_idx in range(n_waste_types):
             if demand_at[j_idx, k_idx] > 0:
                 x[j_idx, k_idx] = int(np.ceil(demand_at[j_idx, k_idx] / instance.params.bin_capacity[k_idx]))
+
     
-    # ── Paso 3: verificar restricción (5) — límite físico ──────
+    # ── Diagnóstico de violaciones ──────────────────────────
+    violations = {}
     for j_idx in range(n_candidates):
-        if z[j_idx]:
-            if np.sum(x[j_idx, :]) > instance.params.max_bins:
-                warnings.warn(
-                    f"Candidate {j_idx} exceeds bin limit with "
-                    f"{int(np.sum(x[j_idx, :]))} bins assigned.",
-                    stacklevel=2,
-                )
+        if z_rep[j_idx]:
+            total_bins_j = int(np.sum(x[j_idx, :]))
+            if total_bins_j > instance.params.max_bins:
+                violations[j_idx] = total_bins_j
+
+    if violations:
+        print(f"  [repair] {len(violations)} punto(s) violan N_j={instance.params.max_bins}:")
+        for j_idx, total in violations.items():
+            print(f"    j={j_idx}: {total} bins (exceso: +{total - instance.params.max_bins})")
+    else:
+        print("  [repair] ✅ Sin violaciones de N_j — solución factible directa")
+    
+
+    # ── Paso 3: reparar violaciones de N_j ──────────────────
+    z_rep = z.copy()
+    max_rapair_iters = n_buildings * n_waste_types  # cota de seguridad para evitar bucles infinitos
+
+    for iterations in range(max_rapair_iters):
+
+        # ── 3a. Buscar un punto que viole N_j ────────────────
+        violating_j = None
+        for j_idx in range(n_candidates):
+            if z_rep[j_idx] and int(np.sum(x[j_idx, :])) > instance.params.max_bins:
+                violating_j = j_idx
+                break
+
+        if violating_j is None:
+            break  # no hay violaciones, solución reparada
+
+
+        # ── 3b. Edificios asignados al punto saturado ───────
+        # Recopilar todos los (i, k) asignados a violating_j
+        assigned_to_j = []
+        for i_idx in range(n_buildings):
+            for k in range(n_waste_types):
+                if y_assign[i_idx, k] == violating_j:
+                    assigned_to_j.append((i_idx, k))
+
+        
+        # ── 3c. Para cada (i, k), buscar su alternativa ────
+        best_i, best_k, best_alt_j = None, None, None
+        best_extra_dist = float('inf')
+
+        for i_idx, k in assigned_to_j:
+            # Recorrer candidatos válidos para (i, k) buscando el más cercano ABIERTO distinto de violating_j
+            for alt_j in valid_candidates[i_idx][k]:
+                if alt_j != violating_j and (z_rep[alt_j] == 1 or True):
+                    # Calcular distancia extra si se reasigna a alt_j
+                    d_current = instance.dij[violating_j][i_idx] if violating_j in instance.dij and i_idx in instance.dij[violating_j] else float('inf')
+                    d_alt = instance.dij[alt_j][i_idx] if alt_j in instance.dij and i_idx in instance.dij[alt_j] else float('inf')
+                    extra_dist = d_alt - d_current
+
+                    if extra_dist < best_extra_dist:
+                        best_extra_dist = extra_dist
+                        best_i, best_k, best_alt_j = i_idx, k, alt_j
+                    
+                    break
+
+        if best_i is None:
+            warnings.warn(f"No se pudo reparar la violación en el punto {violating_j} — no hay alternativas válidas para los edificios asignados.")
+            break
+
+        # ── 3d. Reasignar (best_i, best_k) a best_alt_j ─────
+        # Abrir el punto alternativo si no estaba abierto
+        if z_rep[best_alt_j] == 0:
+            z_rep[best_alt_j] = 1
+
+        # Mover la asignación del edificio al nuevo punto
+        old_j = violating_j
+        y_assign[best_i, best_k] = best_alt_j
+
+        # ── 3e. Recalcular demanda y bins en ambos puntos ──
+        demand_ik = compute_demand(instance.I[best_i].h_i, instance.params, best_k)
+        demand_at[old_j, best_k] -= demand_ik
+        demand_at[best_alt_j, best_k] += demand_ik
+
+        Q_k = instance.params.bin_capacity[best_k]
+        x[old_j, best_k] = int(np.ceil(demand_at[old_j, best_k] / Q_k)) if demand_at[old_j, best_k] > 0 else 0
+        x[best_alt_j, best_k] = int(np.ceil(demand_at[best_alt_j, best_k] / Q_k))
+
 
     
     # ── Paso 4: w — derivar de x ─────────────────────────────────
