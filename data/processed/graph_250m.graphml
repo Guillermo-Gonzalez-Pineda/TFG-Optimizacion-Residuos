@@ -1110,7 +1110,7 @@
       <data key="d8">[83059456, 83059449]</data>
       <data key="d12">False</data>
       <data key="d9">1</data>
-      <data key="d10">['Camino La Rúa', 'Plaza del Cristo']</data>
+      <data key="d10">['Plaza del Cristo', 'Camino La Rúa']</data>
       <data key="d11">residential</data>
       <data key="d13">True</data>
       <data key="d14">23.064999999999998</data>
@@ -3144,7 +3144,7 @@
       <data key="d13">False</data>
       <data key="d14">4.914</data>
     </edge>
-    <data key="d0">2026-06-10 12:32:11</data>
+    <data key="d0">2026-06-10 12:44:35</data>
     <data key="d1">OSMnx 1.9.4</data>
     <data key="d2">epsg:4326</data>
     <data key="d3">True</data>

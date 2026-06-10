@@ -23,7 +23,7 @@ import geopandas as gpd
 import networkx as nx
 import osmnx as ox
 import pandas as pd
-from shapely.geometry import Point
+from shapely.geometry import Point, LineString
 from shapely.ops import unary_union
 from itertools import combinations
 from dataclasses import replace
@@ -274,35 +274,57 @@ def extract_buildings(
     return buildings, idx_to_i, i_to_idx, buildings_gdf
     
 def compute_distances(
-    graph: nx.MultiDiGraph,
+    graph_utm: nx.MultiDiGraph,
     buildings: dict[int, BuildingData],
     candidates: dict[int, CandidateData],
     idx_to_j: dict[int, int],
     cutoff_m: float,
 ) -> dict[int, dict[int, float]]:
-    """Compute sparse Dijkstra distances from candidates to buildings."""
-    building_edges: dict[int, tuple[tuple[int, int, int], float]] = {
-        i: ox.distance.nearest_edges(graph, b.longitude, b.latitude, return_dist=True)
-        for i, b in buildings.items()
-    }
+    """Compute sparse Dijkstra distances with edge interpolation (UTM).
 
+    For each building, the connection point P is the projection onto the
+    nearest edge. Walking distance = min(d(j,u)+along_u, d(j,v)+along_v) + d_perp,
+    where along_u/along_v are the metres along the edge from each endpoint to P.
+    """
+    # ── Proyectar centroides de edificios a UTM ───────────
+    crs_utm = graph_utm.graph["crs"]
+    building_points_utm = gpd.GeoSeries(
+        [Point(b.longitude, b.latitude) for b in buildings.values()],
+        crs="EPSG:4326",
+    ).to_crs(crs_utm)
+    bpts = list(building_points_utm)
+    building_ids = list(buildings.keys())
+
+    # ── Arista más cercana + posición P (precalculado) ────
+    building_edges: dict[int, tuple[int, int, float, float, float]] = {}
+    for pos, i in enumerate(building_ids):
+        pt = bpts[pos]
+        u, v, key = ox.distance.nearest_edges(graph_utm, pt.x, pt.y)
+
+        edge_data = graph_utm[u][v][key]
+        if "geometry" in edge_data:
+            geom = edge_data["geometry"]
+        else:
+            pu = (graph_utm.nodes[u]["x"], graph_utm.nodes[u]["y"])
+            pv = (graph_utm.nodes[v]["x"], graph_utm.nodes[v]["y"])
+            geom = LineString([pu, pv])
+
+        along_u = geom.project(pt)         # metros u → P
+        along_v = geom.length - along_u    # metros v → P
+        d_perp = geom.distance(pt)         # perpendicular real
+        building_edges[i] = (u, v, along_u, along_v, d_perp)
+
+    # ── Dijkstra desde cada candidato + fórmula interpolada ──
     distances: dict[int, dict[int, float]] = {idx: {} for idx in candidates.keys()}
     for c_idx, c_node in idx_to_j.items():
         reachable = nx.single_source_dijkstra_path_length(
-            graph,
-            c_node,
-            cutoff=cutoff_m,
-            weight="length",
+            graph_utm, c_node, cutoff=cutoff_m, weight="length",
         )
-
-        lat_center = sum(b.latitude for b in buildings.values()) / max(len(buildings), 1)
-
-        for b_idx, ((u, v, _key), d_perp) in building_edges.items():
-            d_perp_m = d_perp * 111_320 * math.cos(math.radians(lat_center))
-            dist_via_u = reachable.get(u, float("inf")) + d_perp_m
-            dist_via_v = reachable.get(v, float("inf")) + d_perp_m
-            best = min(dist_via_u, dist_via_v)
-            if best < cutoff_m:
+        for b_idx, (u, v, along_u, along_v, d_perp) in building_edges.items():
+            dist_via_u = reachable.get(u, float("inf")) + along_u
+            dist_via_v = reachable.get(v, float("inf")) + along_v
+            best = min(dist_via_u, dist_via_v) + d_perp
+            if best <= cutoff_m:
                 distances[c_idx][b_idx] = best
     return distances
 
@@ -628,12 +650,17 @@ if __name__ == "__main__":
     print("Step 1/7 — Downloading graph...")
     graph = download_graph(config)
     print(f"          Nodes: {graph.number_of_nodes()}  Edges: {graph.number_of_edges()}")
+
+    # Grafo UTM SOLO para compute_distances
+    graph_utm = ox.project_graph(graph)
+
+    # Guardar el grafo lat/lon para mapas
     graph_path = f"data/processed/graph_{radius}m.graphml"
-    ox.save_graphml(graph, graph_path)
+    ox.save_graphml(graph, graph_path)          # ← graph, NO graph_utm
     print(f"          Graph saved: {graph_path}")
 
     print("Step 2/7 — Extracting candidates...")
-    candidates, idx_to_j, j_to_idx = extract_candidates(graph, config)
+    candidates, idx_to_j, j_to_idx = extract_candidates(graph, config)   # ← graph
     print(f"          Candidates: {len(candidates)}")
 
     print("Step 3/7 — Extracting buildings...")
@@ -658,15 +685,14 @@ if __name__ == "__main__":
 
     print("Step 5/7 — Consolidating candidates...")
     candidates, idx_to_j, j_to_idx = consolidate_candidates(candidates, graph, idx_to_j)
-    print(f"          Candidates after consolidation: {len(candidates)}")
 
     print("Step 6/7 — Computing distances...")
-    dij = compute_distances(graph, buildings, candidates, idx_to_j, config.cutoff_dijkstra)
+    dij = compute_distances(graph_utm, buildings, candidates, idx_to_j, config.cutoff_dijkstra)
     print(f"          Connections: {sum(len(v) for v in dij.values())}")
 
     # ── Step 6b: Garantizar cobertura total ──────────────────
     buildings, candidates, dij, idx_to_j, j_to_idx = ensure_coverage(
-        graph, buildings, candidates, dij, params,
+        graph_utm, buildings, candidates, dij, params,
         idx_to_j, j_to_idx, config.cutoff_dijkstra,
     )
     # Actualizar mapas de edificios por si se eliminaron edificios inalcanzables
