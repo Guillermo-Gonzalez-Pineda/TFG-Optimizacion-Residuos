@@ -626,7 +626,7 @@ if __name__ == "__main__":
         place="Plaza del Cristo, San Cristóbal de La Laguna, España",
         radius=radius,
         network_type="walk",
-        cutoff_dijkstra=350,
+        cutoff_dijkstra=250,
         min_node_degree=3,
         graph_margin=100,
     )
@@ -639,7 +639,7 @@ if __name__ == "__main__":
         overflow_penalty=500.0,
         bin_cost={0: 350.0, 1: 300.0, 2: 250.0, 3: 500.0},
         bin_capacity={0: 120.0, 1: 120.0, 2: 120.0, 3: 120.0},
-        coverage_radius={0: 150.0, 1: 150.0, 2: 250.0, 3: 350.0},
+        coverage_radius={0: 100.0, 1: 100.0, 2: 150.0, 3: 250.0},
         waste_proportion={0: 0.5012, 1: 0.0791, 2: 0.3885, 3: 0.0312},
         collection_frequency={0: 1.0, 1: 1.0, 2: 1.0, 3: 1.0},
         lognormal_mu=0.0,
