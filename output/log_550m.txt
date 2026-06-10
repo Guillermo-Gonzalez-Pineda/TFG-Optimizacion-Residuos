@@ -1,0 +1,197 @@
+=================================================================
+  Lagrangian Relaxation — HDM
+=================================================================
+  Instance: Plaza del Cristo, San Cristóbal de La Laguna, España
+  Buildings: 837  Candidates: 217
+  Waste types: 4
+-----------------------------------------------------------------
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2827120
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+    [descomposición iter 0] z= 120,000.0  x=  38,700.0  yw=       0.0  total= 158,700.0
+  iter    0 | curLB     158700.0 | bestLB     158700.0 | UB     238200.0 | gap  33.38% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 1] z= 119,431.0  x=  38,235.6  yw=     274.5  total= 157,941.0
+    [descomposición iter 2] z= 119,077.4  x=  38,233.4  yw=     327.2  total= 157,637.9
+    [descomposición iter 3] z= 119,033.6  x=  37,956.9  yw=     480.8  total= 157,471.3
+    [descomposición iter 4] z= 118,419.3  x=  38,022.0  yw=     572.9  total= 157,014.2
+    [descomposición iter 50] z= 118,187.9  x=  37,615.8  yw=   3,819.4  total= 159,623.1
+  iter   50 | curLB     159623.1 | bestLB     159826.2 | UB     220800.0 | gap  27.61% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 100] z= 117,986.3  x=  37,467.0  yw=   6,500.9  total= 161,954.2
+  iter  100 | curLB     161954.2 | bestLB     162270.7 | UB     220800.0 | gap  26.51% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 150] z= 117,834.5  x=  37,306.5  yw=   8,343.7  total= 163,484.7
+  iter  150 | curLB     163484.7 | bestLB     163614.7 | UB     220800.0 | gap  25.90% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 200] z= 117,218.6  x=  37,509.8  yw=   9,902.9  total= 164,631.3
+  iter  200 | curLB     164631.3 | bestLB     164927.4 | UB     220800.0 | gap  25.30% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 250] z= 116,901.4  x=  37,322.5  yw=  11,355.7  total= 165,579.6
+  iter  250 | curLB     165579.6 | bestLB     166073.4 | UB     220800.0 | gap  24.79% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 300] z= 116,522.5  x=  37,312.6  yw=  12,702.4  total= 166,537.5
+  iter  300 | curLB     166537.5 | bestLB     166756.1 | UB     220800.0 | gap  24.48% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 350] z= 116,288.3  x=  37,740.1  yw=  13,942.3  total= 167,970.7
+  iter  350 | curLB     167970.7 | bestLB     167970.7 | UB     220800.0 | gap  23.93% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 400] z= 115,747.0  x=  37,299.6  yw=  14,972.8  total= 168,019.4
+  iter  400 | curLB     168019.4 | bestLB     168281.4 | UB     220800.0 | gap  23.79% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 450] z= 115,603.0  x=  37,396.4  yw=  15,590.9  total= 168,590.3
+  iter  450 | curLB     168590.3 | bestLB     168826.2 | UB     220800.0 | gap  23.54% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 500] z= 115,158.0  x=  37,443.9  yw=  16,115.6  total= 168,717.6
+  iter  500 | curLB     168717.6 | bestLB     169184.2 | UB     220800.0 | gap  23.38% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 550] z= 115,468.4  x=  37,124.4  yw=  16,547.8  total= 169,140.6
+  iter  550 | curLB     169140.6 | bestLB     169494.8 | UB     217350.0 | gap  22.02% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 600] z= 115,535.5  x=  37,198.3  yw=  16,802.9  total= 169,536.6
+  iter  600 | curLB     169536.6 | bestLB     169711.7 | UB     217350.0 | gap  21.92% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 650] z= 115,153.5  x=  37,467.6  yw=  17,090.4  total= 169,711.5
+  iter  650 | curLB     169711.5 | bestLB     170154.8 | UB     217350.0 | gap  21.71% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 700] z= 115,200.4  x=  37,479.7  yw=  17,368.8  total= 170,048.8
+  iter  700 | curLB     170048.8 | bestLB     170154.8 | UB     217350.0 | gap  21.71% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 750] z= 114,935.0  x=  36,988.0  yw=  17,739.3  total= 169,662.3
+  iter  750 | curLB     169662.3 | bestLB     170195.3 | UB     217350.0 | gap  21.70% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 800] z= 115,045.8  x=  37,377.9  yw=  18,039.0  total= 170,462.7
+  iter  800 | curLB     170462.7 | bestLB     170462.7 | UB     216350.0 | gap  21.21% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 850] z= 114,868.7  x=  37,292.3  yw=  18,316.6  total= 170,477.6
+  iter  850 | curLB     170477.6 | bestLB     170567.4 | UB     216350.0 | gap  21.16% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 900] z= 114,607.5  x=  37,381.3  yw=  18,584.9  total= 170,573.7
+  iter  900 | curLB     170573.7 | bestLB     170637.4 | UB     216350.0 | gap  21.13% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 950] z= 114,389.6  x=  37,328.9  yw=  18,877.2  total= 170,595.7
+  iter  950 | curLB     170595.7 | bestLB     170840.9 | UB     216350.0 | gap  21.03% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 1000] z= 113,951.7  x=  37,360.2  yw=  19,233.1  total= 170,544.9
+  iter 1000 | curLB     170544.9 | bestLB     170930.1 | UB     216350.0 | gap  20.99% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 1050] z= 113,984.2  x=  37,380.8  yw=  19,430.2  total= 170,795.2
+  iter 1050 | curLB     170795.2 | bestLB     171139.8 | UB     216350.0 | gap  20.90% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 1100] z= 114,076.1  x=  37,273.7  yw=  19,720.4  total= 171,070.3
+  iter 1100 | curLB     171070.3 | bestLB     171374.6 | UB     216350.0 | gap  20.79% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 1150] z= 113,714.1  x=  37,082.1  yw=  20,045.3  total= 170,841.5
+  iter 1150 | curLB     170841.5 | bestLB     171374.6 | UB     216350.0 | gap  20.79% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 1200] z= 113,502.8  x=  37,311.1  yw=  20,238.7  total= 171,052.7
+  iter 1200 | curLB     171052.7 | bestLB     171522.9 | UB     216350.0 | gap  20.72% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 1250] z= 113,701.8  x=  37,118.7  yw=  20,525.7  total= 171,346.2
+  iter 1250 | curLB     171346.2 | bestLB     171541.9 | UB     216350.0 | gap  20.71% | θ 2.0000 | neg_coefs    0 | open  40
+  [mid-polish] UB mejorado: 201,350.0 (gap 14.80%)
+    [descomposición iter 1300] z= 113,651.6  x=  37,648.3  yw=  20,558.5  total= 171,858.4
+  iter 1300 | curLB     171858.4 | bestLB     172138.8 | UB     201350.0 | gap  14.51% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 1350] z= 113,660.8  x=  37,904.4  yw=  20,646.0  total= 172,211.2
+  iter 1350 | curLB     172211.2 | bestLB     172256.6 | UB     201350.0 | gap  14.45% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 1400] z= 113,641.8  x=  37,699.0  yw=  20,843.8  total= 172,184.6
+  iter 1400 | curLB     172184.6 | bestLB     172307.8 | UB     201350.0 | gap  14.42% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 1450] z= 113,595.7  x=  37,762.7  yw=  20,908.3  total= 172,266.7
+  iter 1450 | curLB     172266.7 | bestLB     172366.4 | UB     201350.0 | gap  14.39% | θ 2.0000 | neg_coefs    0 | open  41
+    [descomposición iter 1500] z= 113,413.2  x=  37,794.1  yw=  21,058.0  total= 172,265.3
+  iter 1500 | curLB     172265.3 | bestLB     172503.5 | UB     201350.0 | gap  14.33% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 1550] z= 113,413.3  x=  37,804.8  yw=  21,253.4  total= 172,471.4
+  iter 1550 | curLB     172471.4 | bestLB     172529.9 | UB     201350.0 | gap  14.31% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 1600] z= 113,114.8  x=  37,804.8  yw=  21,366.8  total= 172,286.4
+  iter 1600 | curLB     172286.4 | bestLB     172588.2 | UB     201350.0 | gap  14.28% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 1650] z= 113,224.7  x=  37,964.6  yw=  21,474.0  total= 172,663.3
+  iter 1650 | curLB     172663.3 | bestLB     172663.3 | UB     201350.0 | gap  14.25% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 1700] z= 113,033.5  x=  37,764.0  yw=  21,682.5  total= 172,480.0
+  iter 1700 | curLB     172480.0 | bestLB     172722.1 | UB     201350.0 | gap  14.22% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 1750] z= 112,824.0  x=  37,852.7  yw=  21,752.7  total= 172,429.5
+  iter 1750 | curLB     172429.5 | bestLB     172722.1 | UB     201350.0 | gap  14.22% | θ 2.0000 | neg_coefs    0 | open  38
+  [mid-polish] Sin mejora, desactivado hasta que UB cambie
+    [descomposición iter 1800] z= 112,909.6  x=  37,784.6  yw=  21,894.5  total= 172,588.8
+  iter 1800 | curLB     172588.8 | bestLB     172777.6 | UB     201350.0 | gap  14.19% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 1850] z= 112,805.7  x=  37,873.0  yw=  22,020.8  total= 172,699.6
+  iter 1850 | curLB     172699.6 | bestLB     172822.5 | UB     201350.0 | gap  14.17% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 1900] z= 112,553.5  x=  37,748.8  yw=  22,178.6  total= 172,480.8
+  iter 1900 | curLB     172480.8 | bestLB     172852.2 | UB     201350.0 | gap  14.15% | θ 2.0000 | neg_coefs    0 | open  41
+    [descomposición iter 1950] z= 112,614.6  x=  37,789.6  yw=  22,262.9  total= 172,667.0
+  iter 1950 | curLB     172667.0 | bestLB     172975.2 | UB     201350.0 | gap  14.09% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 2000] z= 112,474.8  x=  37,904.9  yw=  22,395.7  total= 172,775.4
+  iter 2000 | curLB     172775.4 | bestLB     173018.2 | UB     201350.0 | gap  14.07% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 2050] z= 112,428.7  x=  37,901.3  yw=  22,548.6  total= 172,878.6
+  iter 2050 | curLB     172878.6 | bestLB     173090.2 | UB     201350.0 | gap  14.04% | θ 2.0000 | neg_coefs    0 | open  41
+    [descomposición iter 2100] z= 112,364.1  x=  37,818.8  yw=  22,702.3  total= 172,885.2
+  iter 2100 | curLB     172885.2 | bestLB     173140.5 | UB     201350.0 | gap  14.01% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 2150] z= 112,440.1  x=  37,800.2  yw=  22,776.4  total= 173,016.7
+  iter 2150 | curLB     173016.7 | bestLB     173162.3 | UB     201350.0 | gap  14.00% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 2200] z= 112,311.6  x=  37,704.1  yw=  22,948.6  total= 172,964.3
+  iter 2200 | curLB     172964.3 | bestLB     173305.7 | UB     201350.0 | gap  13.93% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 2250] z= 112,380.5  x=  37,693.5  yw=  23,036.2  total= 173,110.1
+  iter 2250 | curLB     173110.1 | bestLB     173333.5 | UB     201350.0 | gap  13.91% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 2300] z= 112,029.5  x=  37,873.8  yw=  23,142.5  total= 173,045.8
+  iter 2300 | curLB     173045.8 | bestLB     173333.5 | UB     201350.0 | gap  13.91% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 2350] z= 112,143.3  x=  37,748.0  yw=  23,300.8  total= 173,192.2
+  iter 2350 | curLB     173192.2 | bestLB     173366.1 | UB     201350.0 | gap  13.90% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 2400] z= 112,005.4  x=  37,670.0  yw=  23,409.1  total= 173,084.5
+  iter 2400 | curLB     173084.5 | bestLB     173395.3 | UB     201350.0 | gap  13.88% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 2450] z= 111,845.8  x=  37,791.0  yw=  23,523.9  total= 173,160.8
+  iter 2450 | curLB     173160.8 | bestLB     173503.2 | UB     201350.0 | gap  13.83% | θ 2.0000 | neg_coefs    0 | open  42
+    [descomposición iter 2500] z= 111,829.2  x=  37,771.9  yw=  23,628.7  total= 173,229.8
+  iter 2500 | curLB     173229.8 | bestLB     173503.2 | UB     201350.0 | gap  13.83% | θ 2.0000 | neg_coefs    0 | open  41
+    [descomposición iter 2550] z= 111,772.0  x=  37,798.4  yw=  23,759.4  total= 173,329.7
+  iter 2550 | curLB     173329.7 | bestLB     173503.2 | UB     201350.0 | gap  13.83% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 2600] z= 111,605.3  x=  37,756.7  yw=  23,848.7  total= 173,210.7
+  iter 2600 | curLB     173210.7 | bestLB     173514.5 | UB     201350.0 | gap  13.82% | θ 2.0000 | neg_coefs    0 | open  41
+    [descomposición iter 2650] z= 111,518.8  x=  37,818.8  yw=  23,988.9  total= 173,326.5
+  iter 2650 | curLB     173326.5 | bestLB     173546.7 | UB     201350.0 | gap  13.81% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 2700] z= 111,375.0  x=  37,887.2  yw=  24,062.8  total= 173,325.0
+  iter 2700 | curLB     173325.0 | bestLB     173621.0 | UB     201350.0 | gap  13.77% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 2750] z= 111,411.9  x=  37,850.6  yw=  24,199.6  total= 173,462.0
+  iter 2750 | curLB     173462.0 | bestLB     173643.3 | UB     201350.0 | gap  13.76% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 2800] z= 111,413.4  x=  37,888.0  yw=  24,319.3  total= 173,620.7
+  iter 2800 | curLB     173620.7 | bestLB     173702.7 | UB     201350.0 | gap  13.73% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 2850] z= 111,121.3  x=  37,823.4  yw=  24,430.1  total= 173,374.7
+  iter 2850 | curLB     173374.7 | bestLB     173751.8 | UB     201350.0 | gap  13.71% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 2900] z= 111,252.9  x=  37,900.7  yw=  24,513.9  total= 173,667.4
+  iter 2900 | curLB     173667.4 | bestLB     173751.8 | UB     201350.0 | gap  13.71% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 2950] z= 111,041.5  x=  37,805.8  yw=  24,605.1  total= 173,452.4
+  iter 2950 | curLB     173452.4 | bestLB     173778.5 | UB     201350.0 | gap  13.69% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 3000] z= 111,047.6  x=  37,789.8  yw=  24,732.8  total= 173,570.3
+  iter 3000 | curLB     173570.3 | bestLB     173789.5 | UB     201350.0 | gap  13.69% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 3050] z= 111,020.6  x=  37,784.2  yw=  24,850.7  total= 173,655.5
+  iter 3050 | curLB     173655.5 | bestLB     173814.3 | UB     201350.0 | gap  13.68% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 3100] z= 110,968.7  x=  37,802.2  yw=  24,924.4  total= 173,695.2
+  iter 3100 | curLB     173695.2 | bestLB     173849.2 | UB     201350.0 | gap  13.66% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 3150] z= 110,857.8  x=  37,868.3  yw=  25,073.2  total= 173,799.3
+  iter 3150 | curLB     173799.3 | bestLB     173925.3 | UB     201350.0 | gap  13.62% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 3200] z= 110,736.3  x=  37,754.5  yw=  25,178.9  total= 173,669.8
+  iter 3200 | curLB     173669.8 | bestLB     173925.3 | UB     201350.0 | gap  13.62% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 3250] z= 110,593.6  x=  37,757.5  yw=  25,287.2  total= 173,638.3
+  iter 3250 | curLB     173638.3 | bestLB     173975.2 | UB     201350.0 | gap  13.60% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 3300] z= 110,706.4  x=  37,812.0  yw=  25,371.0  total= 173,889.4
+  iter 3300 | curLB     173889.4 | bestLB     173975.2 | UB     201350.0 | gap  13.60% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 3350] z= 110,662.4  x=  37,796.3  yw=  25,478.2  total= 173,936.9
+  iter 3350 | curLB     173936.9 | bestLB     174085.5 | UB     201350.0 | gap  13.54% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 3400] z= 110,442.8  x=  37,906.7  yw=  25,563.6  total= 173,913.1
+  iter 3400 | curLB     173913.1 | bestLB     174085.5 | UB     201350.0 | gap  13.54% | θ 2.0000 | neg_coefs    0 | open  42
+    [descomposición iter 3450] z= 110,413.2  x=  37,903.1  yw=  25,654.7  total= 173,971.0
+  iter 3450 | curLB     173971.0 | bestLB     174111.3 | UB     201350.0 | gap  13.53% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 3500] z= 110,369.0  x=  37,691.4  yw=  25,709.6  total= 173,769.9
+  iter 3500 | curLB     173769.9 | bestLB     174111.3 | UB     201350.0 | gap  13.53% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 3550] z= 110,347.1  x=  37,816.2  yw=  25,779.1  total= 173,942.4
+  iter 3550 | curLB     173942.4 | bestLB     174235.8 | UB     201350.0 | gap  13.47% | θ 2.0000 | neg_coefs    0 | open  39
+    [descomposición iter 3600] z= 110,224.8  x=  37,741.1  yw=  25,855.8  total= 173,821.7
+  iter 3600 | curLB     173821.7 | bestLB     174235.8 | UB     201350.0 | gap  13.47% | θ 2.0000 | neg_coefs    0 | open  37
+    [descomposición iter 3650] z= 110,317.0  x=  37,693.2  yw=  25,933.7  total= 173,944.0
+  iter 3650 | curLB     173944.0 | bestLB     174235.8 | UB     201350.0 | gap  13.47% | θ 2.0000 | neg_coefs    0 | open  38
+    [descomposición iter 3700] z= 110,171.8  x=  37,839.5  yw=  25,988.6  total= 173,999.9
+  iter 3700 | curLB     173999.9 | bestLB     174235.8 | UB     201350.0 | gap  13.47% | θ 2.0000 | neg_coefs    0 | open  40
+    [descomposición iter 3750] z= 110,450.5  x=  37,953.2  yw=  26,044.6  total= 174,448.3
+  iter 3750 | curLB     174448.3 | bestLB     174448.3 | UB     201350.0 | gap  13.36% | θ 1.0000 | neg_coefs    0 | open  40
+    [descomposición iter 3800] z= 110,403.4  x=  38,100.1  yw=  26,021.0  total= 174,524.6
+  iter 3800 | curLB     174524.6 | bestLB     174667.9 | UB     201350.0 | gap  13.25% | θ 1.0000 | neg_coefs    0 | open  40
+    [descomposición iter 3850] z= 110,432.2  x=  38,204.6  yw=  26,021.7  total= 174,658.5
+  iter 3850 | curLB     174658.5 | bestLB     174695.2 | UB     201350.0 | gap  13.24% | θ 1.0000 | neg_coefs    0 | open  40
+    [descomposición iter 3900] z= 110,346.4  x=  38,277.0  yw=  26,017.8  total= 174,641.2
+  iter 3900 | curLB     174641.2 | bestLB     174722.2 | UB     201350.0 | gap  13.22% | θ 1.0000 | neg_coefs    0 | open  39
+    [descomposición iter 3950] z= 110,341.7  x=  38,290.3  yw=  26,036.7  total= 174,668.8
+  iter 3950 | curLB     174668.8 | bestLB     174742.4 | UB     201350.0 | gap  13.21% | θ 1.0000 | neg_coefs    0 | open  41
+  [multi-polish] Puliendo 5 soluciones...
+    z#1 (repair=216,350) → polish=201,350.0
+    z#2 (repair=216,950) → polish=200,950.0 ✓
+    z#3 (repair=217,350) → polish=200,700.0 ✓
+    z#4 (repair=217,450) → polish=201,750.0
+    z#5 (repair=217,700) → polish=200,800.0
+  [multi-polish] Mejor UB: 200,700.0 (gap 12.93%)
+  [warm-start] Optimizando con cierre de puntos (time_limit=300s)...
+  [warm-start] UB: 200,700.0 → 196,700.0 (gap 11.16%) — 1 puntos cerrados
+-----------------------------------------------------------------
+  Completed in 4000 iterations (1782.7s)
+  Best LB:  174,742.4
+  Best UB:  196,700.0
+  Gap:      11.16%
+  Points open: 35
+  Total bins:  177
+=================================================================
+  ✅ Pickle guardado y verificado: output/lagrangiana_550m/solucion_lagrangiana.pkl
+  ✅ Resumen JSON:                 output/lagrangiana_550m/solucion_lagrangiana_resumen.json
+=================================================================

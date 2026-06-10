@@ -1,0 +1,11 @@
+=================================================================
+  Lagrangian Relaxation — HDM
+=================================================================
+  Instance: Plaza del Cristo, San Cristóbal de La Laguna, España
+  Buildings: 1214  Candidates: 382
+  Waste types: 4
+-----------------------------------------------------------------
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2827120
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es

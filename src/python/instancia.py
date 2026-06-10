@@ -34,6 +34,7 @@ class GeographicConfig:
     network_type: str
     cutoff_dijkstra: int
     min_node_degree: int
+    graph_margin: int
 
 
 @dataclass(frozen=True)
@@ -107,7 +108,7 @@ class Instance:
     J: dict[int, CandidateData] # idx → candidate data
 
     # --- Distances (sparse, internal indices) ---
-    dij: dict[int, dict[int, float]]  # dij[i_idx][j_idx] = distance in meters
+    dij: dict[int, dict[int, float]]  # dij[j_idx][i_idx] = distance in meters
 
     # --- Model parameters ---
     params: ModelParameters

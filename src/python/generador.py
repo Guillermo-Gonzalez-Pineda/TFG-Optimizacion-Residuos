@@ -10,6 +10,8 @@ References:
     Boeing (2025). Geographical Analysis 57, 567-577.
 """
 
+from __future__ import annotations
+
 import os
 import warnings
 import math
@@ -73,7 +75,7 @@ def download_graph(config: GeographicConfig) -> nx.MultiDiGraph:
     """Download and filter the pedestrian street network via OSMnx."""
     graph: nx.MultiDiGraph = ox.graph_from_address(
         config.place,
-        dist=config.radius,
+        dist=config.radius + config.graph_margin,
         network_type=config.network_type,
     )
 
@@ -240,7 +242,7 @@ def consolidate_candidates(
 def extract_buildings(
     config: GeographicConfig,
     ref_surface_m2: float = 30.0,
-) -> tuple[dict[int, BuildingData], dict[str, int], dict[int, str]]:
+) -> tuple[dict[int, BuildingData], dict[str, int], dict[int, str], gpd.GeoDataFrame]:
     """Extract building data from OSM within the specified area."""
 
     buildings_gdf: gpd.GeoDataFrame = ox.features_from_address(
@@ -268,8 +270,8 @@ def extract_buildings(
         )
         idx_to_i[i] = str(osm_id)
         i_to_idx[str(osm_id)] = i
-    
-    return buildings, idx_to_i, i_to_idx
+
+    return buildings, idx_to_i, i_to_idx, buildings_gdf
     
 def compute_distances(
     graph: nx.MultiDiGraph,
@@ -292,8 +294,11 @@ def compute_distances(
             cutoff=cutoff_m,
             weight="length",
         )
+
+        lat_center = sum(b.latitude for b in buildings.values()) / max(len(buildings), 1)
+
         for b_idx, ((u, v, _key), d_perp) in building_edges.items():
-            d_perp_m = d_perp * 111_320 * math.cos(math.radians(28.48))
+            d_perp_m = d_perp * 111_320 * math.cos(math.radians(lat_center))
             dist_via_u = reachable.get(u, float("inf")) + d_perp_m
             dist_via_v = reachable.get(v, float("inf")) + d_perp_m
             best = min(dist_via_u, dist_via_v)
@@ -333,6 +338,99 @@ def evaluate_coverage(
             uncovered[i_idx] = missing_types
 
     return uncovered
+
+
+def ensure_coverage(
+    graph: nx.MultiDiGraph,
+    buildings: dict[int, BuildingData],
+    candidates: dict[int, CandidateData],
+    dij: dict[int, dict[int, float]],
+    params: ModelParameters,
+    idx_to_j: dict[int, int],
+    j_to_idx: dict[int, int],
+    cutoff_m: float,
+) -> tuple[
+    dict[int, BuildingData],
+    dict[int, CandidateData],
+    dict[int, dict[int, float]],
+    dict[int, int],
+    dict[int, int],
+]:
+    """Guarantee full coverage of every building.
+
+    Adds an artificial STREET candidate at the nearest graph node to each
+    uncovered building, recomputes distances, and drops any building that
+    still cannot be covered. Returns the (possibly modified) buildings,
+    candidates, distances and candidate index maps.
+    """
+    # --- Paso A: identificar edificios sin cobertura ---
+    uncovered = evaluate_coverage(buildings, dij, params)
+    if not uncovered:
+        return buildings, candidates, dij, idx_to_j, j_to_idx
+
+    # --- Paso B: añadir candidato artificial junto a cada edificio sin cobertura ---
+    node_coords = {n: (data["y"], data["x"]) for n, data in graph.nodes(data=True)}
+    next_j_idx = max(candidates.keys()) + 1 if candidates else 0
+
+    added = 0
+    for b_idx in uncovered:
+        b = buildings[b_idx]
+        # Encontrar el nodo del grafo más cercano que no sea ya candidato
+        best_node, best_dist = None, float("inf")
+        for node_id, (lat, lon) in node_coords.items():
+            if node_id in j_to_idx:
+                continue
+            d = math.sqrt((b.latitude - lat) ** 2 + (b.longitude - lon) ** 2)
+            d_m = d * 111_320 * math.cos(math.radians(b.latitude))
+            if d_m < best_dist:
+                best_dist = d_m
+                best_node = node_id
+
+        if best_node is not None:
+            lat, lon = node_coords[best_node]
+            candidates[next_j_idx] = CandidateData(
+                osm_id=str(best_node),
+                latitude=lat,
+                longitude=lon,
+                context=CandidateContext.STREET,
+            )
+            idx_to_j[next_j_idx] = best_node
+            j_to_idx[best_node] = next_j_idx
+            next_j_idx += 1
+            added += 1
+
+    # --- Paso C: recomputar distancias con los nuevos candidatos ---
+    if added > 0:
+        dij = compute_distances(graph, buildings, candidates, idx_to_j, cutoff_m)
+
+    # --- Paso D: reevaluar cobertura ---
+    uncovered = evaluate_coverage(buildings, dij, params)
+
+    # --- Paso E: eliminar edificios aún inalcanzables y re-indexar ---
+    if uncovered:
+        # Re-indexar contiguamente para no dejar huecos en los índices de edificio
+        old_to_new: dict[int, int] = {
+            old_idx: new_idx
+            for new_idx, old_idx in enumerate(
+                sorted(i for i in buildings if i not in uncovered)
+            )
+        }
+        new_buildings: dict[int, BuildingData] = {
+            new_idx: buildings[old_idx]
+            for old_idx, new_idx in old_to_new.items()
+        }
+        dij = {
+            j: {
+                old_to_new[i]: dist
+                for i, dist in building_distances.items()
+                if i in old_to_new
+            }
+            for j, building_distances in dij.items()
+        }
+        buildings = new_buildings
+        print(f"Removed {len(uncovered)} unreachable buildings from instance")
+
+    return buildings, candidates, dij, idx_to_j, j_to_idx
 
 
 def add_midpoint_candidates(
@@ -496,14 +594,19 @@ def save_instance(instance: Instance, path: str) -> None:
 
 
 if __name__ == "__main__":
+    import sys
     from instancia import ModelParameters
+
+    # Radio como argumento: python3 generador.py 750
+    radius = int(sys.argv[1]) if len(sys.argv) > 1 else 500
 
     config = GeographicConfig(
         place="Plaza del Cristo, San Cristóbal de La Laguna, España",
-        radius=500,
+        radius=radius,
         network_type="walk",
         cutoff_dijkstra=350,
         min_node_degree=3,
+        graph_margin=100,
     )
 
     params = ModelParameters(
@@ -525,14 +628,30 @@ if __name__ == "__main__":
     print("Step 1/7 — Downloading graph...")
     graph = download_graph(config)
     print(f"          Nodes: {graph.number_of_nodes()}  Edges: {graph.number_of_edges()}")
+    graph_path = f"data/processed/graph_{radius}m.graphml"
+    ox.save_graphml(graph, graph_path)
+    print(f"          Graph saved: {graph_path}")
 
     print("Step 2/7 — Extracting candidates...")
     candidates, idx_to_j, j_to_idx = extract_candidates(graph, config)
     print(f"          Candidates: {len(candidates)}")
 
     print("Step 3/7 — Extracting buildings...")
-    buildings, i_to_idx, idx_to_i = extract_buildings(config)
+    buildings, i_to_idx, idx_to_i, gdf_buildings = extract_buildings(config)
     print(f"          Buildings: {len(buildings)}")
+
+    # Limpiar columnas problemáticas para GeoJSON
+    from shapely.geometry.base import BaseGeometry
+    for col in gdf_buildings.columns:
+        if col != "geometry":
+            if gdf_buildings[col].apply(
+                lambda x: isinstance(x, (list, dict, BaseGeometry))
+            ).any():
+                gdf_buildings[col] = gdf_buildings[col].astype(str)
+
+    buildings_path = f"data/processed/buildings_{radius}m.geojson"
+    gdf_buildings.to_file(buildings_path, driver="GeoJSON")
+    print(f"          Buildings GeoJSON saved: {buildings_path}")
 
     print("Step 4/7 — Classifying candidate context...")
     candidates = classify_candidate_context(config, candidates, graph, idx_to_j)
@@ -544,6 +663,15 @@ if __name__ == "__main__":
     print("Step 6/7 — Computing distances...")
     dij = compute_distances(graph, buildings, candidates, idx_to_j, config.cutoff_dijkstra)
     print(f"          Connections: {sum(len(v) for v in dij.values())}")
+
+    # ── Step 6b: Garantizar cobertura total ──────────────────
+    buildings, candidates, dij, idx_to_j, j_to_idx = ensure_coverage(
+        graph, buildings, candidates, dij, params,
+        idx_to_j, j_to_idx, config.cutoff_dijkstra,
+    )
+    # Actualizar mapas de edificios por si se eliminaron edificios inalcanzables
+    idx_to_i = {idx: osm for idx, osm in idx_to_i.items() if idx in buildings}
+    i_to_idx = {osm: idx for idx, osm in idx_to_i.items()}
 
     print("Step 7/7 — Building and saving instance...")
     uncovered = evaluate_coverage(buildings, dij, params)
@@ -557,7 +685,7 @@ if __name__ == "__main__":
         i_to_idx, idx_to_i, j_to_idx, idx_to_j, dij,
     )
 
-    output_path = "data/processed/instancia_laguna.json"
+    output_path = f"data/processed/instancia_laguna_{radius}m.json"
     save_instance(instance, output_path)
     print(f"\n✓ Instance saved to {output_path}")
     print(f"  Buildings:   {instance.n_buildings}")

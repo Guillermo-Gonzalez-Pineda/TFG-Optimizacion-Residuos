@@ -132,10 +132,17 @@ if __name__ == "__main__":
     from instancia import load_instance
     import sys
     import os
+    import re
 
-    os.makedirs("output", exist_ok=True)
-    log_path = "output/lagrangiana_run.log"
-    
+    instance_path = sys.argv[1] if len(sys.argv) > 1 else "data/processed/instancia_laguna_500m.json"
+
+    radius_match = re.search(r'(\d+)m', instance_path)
+    radius_tag = radius_match.group(1) + "m" if radius_match else "default"
+
+    output_dir = f"output/exacto_{radius_tag}"
+    os.makedirs(output_dir, exist_ok=True)
+    log_path = f"{output_dir}/gurobi_run.log"
+
     # Redirigir stdout y stderr al fichero y pantalla simultáneamente
     class Tee:
         def __init__(self, *files):
@@ -156,7 +163,7 @@ if __name__ == "__main__":
     print("  Exact HDM — Gurobi MIP")
     print("=" * 65)
 
-    inst = load_instance("data/processed/instancia_laguna.json")
+    inst = load_instance(instance_path)
     vc = precompute_valid_candidates(inst)
 
     print(f"  Instance: {inst.study_case}")
@@ -164,7 +171,7 @@ if __name__ == "__main__":
     print(f"  Valid y-variables: {sum(len(vc[i][k]) for i in range(inst.n_buildings) for k in range(inst.n_waste_types))}")
     print("-" * 65)
 
-    result = solve_exact_hdm(inst, vc, time_limit=7200, verbose=True)
+    result = solve_exact_hdm(inst, vc, time_limit=10800, verbose=True)
 
     print("-" * 65)
     if result["cost"] is not None:
@@ -182,10 +189,10 @@ if __name__ == "__main__":
     if result["cost"] is not None:
         import pickle, json
 
-        os.makedirs("output", exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
 
         # 1. Pickle completo (preserva claves tupla)
-        pkl_path = "output/solucion_exacta.pkl"
+        pkl_path = f"{output_dir}/solucion_exacta.pkl"
         with open(pkl_path, "wb") as f:
             pickle.dump(result, f)
 
@@ -196,7 +203,7 @@ if __name__ == "__main__":
         assert len(check["y_assign"]) == len(result["y_assign"]), "ERROR: asignaciones perdidas"
 
         # 3. Resumen legible en JSON (backup sin claves tupla)
-        json_path = "output/solucion_exacta_resumen.json"
+        json_path = f"{output_dir}/solucion_exacta_resumen.json"
         resumen = {
             "cost": result["cost"],
             "gap_gurobi": result["gap_gurobi"],
