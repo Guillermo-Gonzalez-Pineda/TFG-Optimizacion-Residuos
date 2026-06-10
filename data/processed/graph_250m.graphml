@@ -1110,7 +1110,7 @@
       <data key="d8">[83059456, 83059449]</data>
       <data key="d12">False</data>
       <data key="d9">1</data>
-      <data key="d10">['Plaza del Cristo', 'Camino La Rúa']</data>
+      <data key="d10">['Camino La Rúa', 'Plaza del Cristo']</data>
       <data key="d11">residential</data>
       <data key="d13">True</data>
       <data key="d14">23.064999999999998</data>
@@ -1399,7 +1399,7 @@
     <edge source="919596735" target="919596737" id="0">
       <data key="d8">[78331169, 78823011]</data>
       <data key="d12">False</data>
-      <data key="d10">['Avenida de la República Argentina', 'Calle Barranco de Gonzaliánez']</data>
+      <data key="d10">['Calle Barranco de Gonzaliánez', 'Avenida de la República Argentina']</data>
       <data key="d11">residential</data>
       <data key="d13">False</data>
       <data key="d14">94.23</data>
@@ -1434,7 +1434,7 @@
     <edge source="919596737" target="919596735" id="0">
       <data key="d8">[78331169, 78823011]</data>
       <data key="d12">False</data>
-      <data key="d10">['Avenida de la República Argentina', 'Calle Barranco de Gonzaliánez']</data>
+      <data key="d10">['Calle Barranco de Gonzaliánez', 'Avenida de la República Argentina']</data>
       <data key="d11">residential</data>
       <data key="d13">True</data>
       <data key="d14">94.22999999999999</data>
@@ -2070,7 +2070,7 @@
     <edge source="974696592" target="13115997328" id="0">
       <data key="d8">[201544092, 201544111]</data>
       <data key="d12">False</data>
-      <data key="d10">['Calle Aguamansa', 'Calle Picachos']</data>
+      <data key="d10">['Calle Picachos', 'Calle Aguamansa']</data>
       <data key="d11">residential</data>
       <data key="d13">True</data>
       <data key="d14">91.313</data>
@@ -2687,7 +2687,7 @@
       <data key="d8">[83059456, 83059449]</data>
       <data key="d12">False</data>
       <data key="d9">1</data>
-      <data key="d10">['Plaza del Cristo', 'Camino La Rúa']</data>
+      <data key="d10">['Camino La Rúa', 'Plaza del Cristo']</data>
       <data key="d11">residential</data>
       <data key="d13">False</data>
       <data key="d14">23.064999999999998</data>
@@ -2772,7 +2772,7 @@
       <data key="d8">[1192697552, 1192697553]</data>
       <data key="d10">Callejón Mafasca</data>
       <data key="d11">service</data>
-      <data key="d19">['driveway', 'alley']</data>
+      <data key="d19">['alley', 'driveway']</data>
       <data key="d12">False</data>
       <data key="d13">False</data>
       <data key="d14">61.227000000000004</data>
@@ -2942,7 +2942,7 @@
     <edge source="13115997328" target="974696592" id="0">
       <data key="d8">[201544092, 201544111]</data>
       <data key="d12">False</data>
-      <data key="d10">['Calle Aguamansa', 'Calle Picachos']</data>
+      <data key="d10">['Calle Picachos', 'Calle Aguamansa']</data>
       <data key="d11">residential</data>
       <data key="d13">False</data>
       <data key="d14">91.313</data>
@@ -3129,7 +3129,7 @@
     </edge>
     <edge source="13873595111" target="966281922" id="0">
       <data key="d8">[83059433, 83059429]</data>
-      <data key="d11">['service', 'steps']</data>
+      <data key="d11">['steps', 'service']</data>
       <data key="d12">False</data>
       <data key="d13">True</data>
       <data key="d14">31.326</data>
@@ -3144,7 +3144,7 @@
       <data key="d13">False</data>
       <data key="d14">4.914</data>
     </edge>
-    <data key="d0">2026-06-09 11:46:27</data>
+    <data key="d0">2026-06-10 12:32:11</data>
     <data key="d1">OSMnx 1.9.4</data>
     <data key="d2">epsg:4326</data>
     <data key="d3">True</data>
