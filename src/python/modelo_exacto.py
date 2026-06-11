@@ -47,7 +47,7 @@ def solve_exact_hdm(
 
     # ── Objetivo (1) ──────────────────────────────────────
     model.setObjective(
-        gp.quicksum(params.opening_cost * z[j] for j in range(n_j))
+        gp.quicksum(instance.J[j].opening_cost * z[j] for j in range(n_j))
         + gp.quicksum(params.bin_cost[k] * x[j, k]
                        for j in range(n_j) for k in range(n_k)),
         GRB.MINIMIZE

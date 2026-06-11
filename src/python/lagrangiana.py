@@ -371,7 +371,7 @@ def solve_plr_z(
 
     # Actualizar coeficientes del objetivo: coef[j] = C_j - N_j * lambda_j
     for j in range(n_candidates):
-        z_vars[j].Obj = instance.params.opening_cost - multipliers.lbd[j] * instance.params.max_bins
+        z_vars[j].Obj = instance.J[j].opening_cost - multipliers.lbd[j] * instance.params.max_bins
 
     # Resolver y extraer solución
     model.optimize()
@@ -412,6 +412,7 @@ def repair_solution(
     n_waste_types = len(instance.K)
     N_j = instance.params.max_bins  # 8
     z_rep = z.copy()
+    C_j = np.array([instance.J[j].opening_cost for j in range(n_candidates)])
 
     # ────────────────────────────────────────────────────────────
     #  Funciones internas para evitar repetir código
@@ -508,7 +509,7 @@ def repair_solution(
     while improved:
         improved = False
         best_cost = (
-            np.sum(z_rep) * instance.params.opening_cost
+            np.sum(z_rep * C_j)
             + np.sum(x * np.array([instance.params.bin_cost[k] for k in instance.K]))
         )
 
@@ -542,7 +543,7 @@ def repair_solution(
 
             # ¿El coste mejoró?
             trial_cost = (
-                np.sum(z_rep) * instance.params.opening_cost
+                np.sum(z_rep * C_j)
                 + np.sum(x_trial * np.array([instance.params.bin_cost[k] for k in instance.K]))
             )
 
@@ -572,7 +573,7 @@ def repair_solution(
 
     # Fallback: si Gurobi falla, devolver solución heurística
     w = (x > 0).astype(bool)
-    fixed_cost = np.sum(z_rep * instance.params.opening_cost)
+    fixed_cost = np.sum(z_rep * C_j)
     variable_cost = np.sum(x * np.array([instance.params.bin_cost[k] for k in instance.K]))
     cost = fixed_cost + variable_cost
     return FeasibleSolution(z=z_rep, x=x, y_assign=y_assign, w=w, cost=cost)
@@ -773,7 +774,7 @@ def solve_fixed_locations(
         # z es variable → el coste fijo Σⱼ C_j·z[j] forma parte del
         # objetivo: cerrar puntos innecesarios reduce el coste total.
         model.setObjective(
-            gp.quicksum(params.opening_cost * z[j] for j in range(n_j))
+            gp.quicksum(instance.J[j].opening_cost * z[j] for j in range(n_j))
             + gp.quicksum(
                 params.bin_cost[k] * x[j, k]
                 for j in open_j for k in range(n_k)
@@ -898,7 +899,7 @@ def solve_fixed_locations(
     else:
         # z fija: coste total = coste fijo (constante) + variable (ObjVal)
         z_sol = z_fixed.copy()
-        fixed_cost = float(np.sum(z_fixed * params.opening_cost))
+        fixed_cost = float(np.sum(z_fixed * np.array([instance.J[j].opening_cost for j in range(n_j)])))
         variable_cost = float(model.ObjVal)
         total_cost = fixed_cost + variable_cost
 

@@ -34,7 +34,8 @@ class GeographicConfig:
     network_type: str
     cutoff_dijkstra: int
     min_node_degree: int
-    graph_margin: int
+    graph_margin: int = 100
+    base_opening_cost: float = 4000.0
 
 
 @dataclass(frozen=True)
@@ -73,12 +74,11 @@ class BuildingData:
 
 @dataclass(frozen=True)
 class CandidateData:
-    """Data for a candidate location in the problem instance."""
-
     osm_id: str
     latitude: float
     longitude: float
     context: CandidateContext = CandidateContext.STREET
+    opening_cost: float = 4000.0 
 
 
 @dataclass(frozen=True)
@@ -163,7 +163,8 @@ def load_instance(path: str) -> Instance:
             osm_id=v['osm_id'],
             latitude=v['latitude'],
             longitude=v['longitude'],
-            context=CandidateContext(v['context'])
+            context=CandidateContext(v['context']),
+            opening_cost=v.get('opening_cost', 4000.0)  # Valor por defecto si no está presente
         ) for k, v in data['sets']['J'].items()
     }
 

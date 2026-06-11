@@ -1,32 +1,35 @@
 """
-Instance generator for the waste collection point location problem.
+Generador de instancias para el problema de localización de contenedores de
+residuos (módulo 4/4: orquestación).
 
-Downloads the OSMnx pedestrian network, extracts buildings and candidate
-collection points, computes sparse Dijkstra distances, and serialises
-the result to JSON.
+Pipeline completo:
+    1. download_graph / project_to_utm    (generador_grafo)
+    2. extract_candidates                  (generador_extraccion)
+    3. extract_buildings                   (generador_extraccion)
+    4. classify_candidate_context          (generador_extraccion)
+    5. consolidate_candidates              (generador_extraccion)
+    6. compute_distances                   (generador_distancias)
+   6b. ensure_coverage                     (generador_distancias)
+    7. build_instance + save_instance      (este módulo)
 
-References:
+Este módulo solo contiene el ensamblado final (build_instance), la
+serialización a JSON (save_instance) y el __main__ que encadena los pasos. Toda
+la lógica de grafo, extracción y distancias vive en los tres módulos hermanos.
+
+Uso:
+    python3 generador.py [radio_en_metros]   # por defecto 500
+
+Referencias:
     Li et al. (2026). Waste Management 209, 115211.
     Boeing (2025). Geographical Analysis 57, 567-577.
 """
 
 from __future__ import annotations
 
-import os
-import warnings
-import math
-from typing import Any
-from datetime import datetime
 import json
-
-import geopandas as gpd
-import networkx as nx
-import osmnx as ox
-import pandas as pd
-from shapely.geometry import Point, LineString
-from shapely.ops import unary_union
-from itertools import combinations
-from dataclasses import replace
+import os
+from datetime import datetime
+from typing import Any
 
 from instancia import (
     BuildingData,
@@ -34,473 +37,30 @@ from instancia import (
     GeographicConfig,
     Instance,
     ModelParameters,
-    CandidateContext,
 )
 
-ox.settings.use_cache = True
-ox.settings.log_console = False
-
-_NON_WALKABLE_HIGHWAY_TAGS: frozenset[str] = frozenset({
-    "motorway", "motorway_link",
-    "trunk", "trunk_link",
-    "track",
-})
-
-_NON_WALKABLE_SERVICE_SUBTYPES: frozenset[str] = frozenset({
-    "driveway",
-    "parking_aisle",
-})
-
-def _is_non_walkable(data: dict[str, Any]) -> bool:
-    """Return True if the edge should be excluded from the pedestrian network."""
-    tag = _highway_tag(data)
-    if tag in _NON_WALKABLE_HIGHWAY_TAGS:
-        return True
-    if tag == "service":
-        subtype = data.get("service", "")
-        if isinstance(subtype, list):
-            subtype = subtype[0]
-        access = data.get("access", "")
-        if isinstance(access, list):
-            access = access[0]
-    return False
-
-def _highway_tag(data: dict[str, Any]) -> str:
-    """Normalise the OSMnx highway attribute to a single string."""
-    tag = data.get("highway", "")
-    return tag[0] if isinstance(tag, list) else tag
-
-
-def download_graph(config: GeographicConfig) -> nx.MultiDiGraph:
-    """Download and filter the pedestrian street network via OSMnx."""
-    graph: nx.MultiDiGraph = ox.graph_from_address(
-        config.place,
-        dist=config.radius + config.graph_margin,
-        network_type=config.network_type,
-    )
-
-    edges_to_remove = [
-        (u, v, k)
-        for u, v, k, data in graph.edges(keys=True, data=True)
-        if _is_non_walkable(data)
-    ]
-    graph.remove_edges_from(edges_to_remove)
-
-    return graph
-
-    
-
-
-def extract_candidates(
-    graph: nx.MultiDiGraph,
-    config: GeographicConfig,
-) -> tuple[dict[int, CandidateData], dict[int, int], dict[int, int]]:
-
-    """Extract candidate collection points from the graph nodes."""
-
-    candidates: dict[int, CandidateData] = {}
-    idx_to_j: dict[int, int] = {}
-    j_to_idx: dict[int, int] = {}
-    new_index = 0
-    for node, data in graph.nodes.items():
-        if data.get("street_count", 0) >= config.min_node_degree:
-            candidates[new_index] = CandidateData(
-                osm_id=str(node),
-                latitude=data["y"],
-                longitude=data["x"],
-            )
-            idx_to_j[new_index] = node
-            j_to_idx[node] = new_index
-            new_index += 1
-            
-
-    return candidates, idx_to_j, j_to_idx
-
-
-
-def classify_candidate_context(
-    config: GeographicConfig,
-    candidates: dict[int, CandidateData],
-    graph: nx.MultiDiGraph,
-    idx_to_j: dict[int, int],
-) -> dict[int, CandidateData]:
-    """Classify the urban context of each candidate collection point."""
-    
-    parks_gdf = ox.features_from_address(
-        config.place,
-        tags={"leisure": "park"},
-        dist=config.radius
-    )
-    squares_gdf = ox.features_from_address(
-        config.place,
-        tags={"place": "square"},
-        dist=config.radius
-    )
-
-    parks_gdf = parks_gdf[
-        parks_gdf.geometry.type.isin(["Polygon", "MultiPolygon"])
-    ].copy()
-
-    squares_gdf = squares_gdf[
-        squares_gdf.geometry.type.isin(["Polygon", "MultiPolygon"])
-    ].copy()
-
-    park_union = unary_union(parks_gdf.geometry) if len(parks_gdf) > 0 else None
-    square_union = unary_union(squares_gdf.geometry) if len(squares_gdf) > 0 else None
-
-    roundabout_nodes: set[int] = set()
-    for u, v, data in graph.edges(data=True):
-        if data.get("junction") == "roundabout":
-            roundabout_nodes.add(u)
-            roundabout_nodes.add(v)
-
-    classified: dict[int, CandidateData] = {}
-    for idx, candidate in candidates.items():
-        point = Point(candidate.longitude, candidate.latitude)
-        if idx_to_j[idx] in roundabout_nodes:
-            context = CandidateContext.ROUNDABOUT
-        elif park_union and park_union.contains(point):
-            context = CandidateContext.PARK
-        elif square_union and square_union.contains(point):
-            context = CandidateContext.SQUARE
-        else:
-            context = CandidateContext.STREET
-        classified[idx] = replace(candidate, context=context)
-
-    return classified
-        
-_CONSOLIDATION_THRESHOLDS: dict[str, float] = {
-    CandidateContext.STREET:        10.0,
-    CandidateContext.ROUNDABOUT:    20.0,
-    CandidateContext.DENSE_CLUSTER: 15.0,
-}
-
-def _euclidean_distance_m(
-    candidate1: CandidateData,
-    candidate2: CandidateData,
-) -> float:
-    """Calculate the Euclidean distance in meters between two candidates."""
-    latm = (candidate1.latitude - candidate2.latitude) * 111_320
-    lonm = (candidate1.longitude - candidate2.longitude) * 111_320 * math.cos(math.radians(candidate1.latitude))
-    return math.sqrt(latm**2 + lonm**2)
-
-
-def consolidate_candidates(
-    candidates: dict[int, CandidateData],
-    graph: nx.MultiDiGraph,
-    idx_to_j: dict[int, int],
-) -> tuple[dict[int, CandidateData], dict[int, int], dict[int, int]]:
-    """Consolidate spatially redundant candidates using connected components."""
-
-    _EXCLUDED_CONTEXTS: frozenset[CandidateContext] = frozenset({
-        CandidateContext.PARK,
-        CandidateContext.SQUARE,
-    })
-
-    candidates = {
-        idx: c for idx, c in candidates.items()
-        if c.context not in _EXCLUDED_CONTEXTS
-    }
-
-    # --- Paso 1: Construir grafo de proximidad ---
-    proximity_graph = nx.Graph()
-    proximity_graph.add_nodes_from(candidates.keys())
-
-    for idx1, idx2 in combinations(candidates.keys(), 2):
-        dist = _euclidean_distance_m(candidates[idx1], candidates[idx2])
-        threshold = max(
-            _CONSOLIDATION_THRESHOLDS.get(candidates[idx1].context, 15.0),
-            _CONSOLIDATION_THRESHOLDS.get(candidates[idx2].context, 15.0),
-        )
-        if dist < threshold:
-            proximity_graph.add_edge(idx1, idx2)
-
-    # --- Paso 2: Componentes conexas ---
-    representatives: list[int] = []
-    for component in nx.connected_components(proximity_graph):
-        representative = max(
-            component,
-            key=lambda idx: (graph.degree(idx_to_j[idx]), -idx),
-        )
-        representatives.append(representative)
-
-    # --- Paso 3: Reasignar índices contiguos ---
-    new_candidates: dict[int, CandidateData] = {}
-    new_idx_to_j: dict[int, int] = {}
-    new_j_to_idx: dict[int, int] = {}
-
-    for new_idx, rep_idx in enumerate(sorted(representatives)):
-        osm_node = idx_to_j[rep_idx]
-        new_candidates[new_idx] = candidates[rep_idx]
-        new_idx_to_j[new_idx] = osm_node
-        new_j_to_idx[osm_node] = new_idx
-
-    return new_candidates, new_idx_to_j, new_j_to_idx
-
-
-
-def extract_buildings(
-    config: GeographicConfig,
-    ref_surface_m2: float = 30.0,
-) -> tuple[dict[int, BuildingData], dict[str, int], dict[int, str], gpd.GeoDataFrame]:
-    """Extract building data from OSM within the specified area."""
-
-    buildings_gdf: gpd.GeoDataFrame = ox.features_from_address(
-        config.place,
-        tags={"building": True},
-        dist=config.radius
-    )
-    buildings_gdf = buildings_gdf[buildings_gdf.geometry.type.isin(["Polygon", "MultiPolygon"])].copy()
-
-    buildings_utm = buildings_gdf.to_crs(buildings_gdf.estimate_utm_crs())
-    buildings_utm["centroid"] = buildings_utm.geometry.centroid  # ← mueve esta línea aquí
-    buildings_gdf["area_m2"] = buildings_utm.geometry.area
-    buildings_gdf["h_i"] = (buildings_gdf["area_m2"] / ref_surface_m2).clip(lower=1.0)
-    buildings_gdf["centroid"] = buildings_utm["centroid"].to_crs("EPSG:4326")  # ← reproyecta de vuelta a WGS84
-
-    buildings: dict[int, BuildingData] = {}
-    i_to_idx: dict[str, int] = {}
-    idx_to_i : dict[int, str] = {}
-    for i, (osm_id, row) in enumerate(buildings_gdf.iterrows()):
-        buildings[i] = BuildingData(
-            osm_id=str(osm_id),
-            latitude=row["centroid"].y,
-            longitude=row["centroid"].x,
-            h_i=row.h_i,
-        )
-        idx_to_i[i] = str(osm_id)
-        i_to_idx[str(osm_id)] = i
-
-    return buildings, idx_to_i, i_to_idx, buildings_gdf
-    
-def compute_distances(
-    graph_utm: nx.MultiDiGraph,
-    buildings: dict[int, BuildingData],
-    candidates: dict[int, CandidateData],
-    idx_to_j: dict[int, int],
-    cutoff_m: float,
-) -> dict[int, dict[int, float]]:
-    """Compute sparse Dijkstra distances with edge interpolation (UTM).
-
-    For each building, the connection point P is the projection onto the
-    nearest edge. Walking distance = min(d(j,u)+along_u, d(j,v)+along_v) + d_perp,
-    where along_u/along_v are the metres along the edge from each endpoint to P.
-    """
-    # ── Proyectar centroides de edificios a UTM ───────────
-    crs_utm = graph_utm.graph["crs"]
-    building_points_utm = gpd.GeoSeries(
-        [Point(b.longitude, b.latitude) for b in buildings.values()],
-        crs="EPSG:4326",
-    ).to_crs(crs_utm)
-    bpts = list(building_points_utm)
-    building_ids = list(buildings.keys())
-
-    # ── Arista más cercana + posición P (precalculado) ────
-    building_edges: dict[int, tuple[int, int, float, float, float]] = {}
-    for pos, i in enumerate(building_ids):
-        pt = bpts[pos]
-        u, v, key = ox.distance.nearest_edges(graph_utm, pt.x, pt.y)
-
-        edge_data = graph_utm[u][v][key]
-        if "geometry" in edge_data:
-            geom = edge_data["geometry"]
-        else:
-            pu = (graph_utm.nodes[u]["x"], graph_utm.nodes[u]["y"])
-            pv = (graph_utm.nodes[v]["x"], graph_utm.nodes[v]["y"])
-            geom = LineString([pu, pv])
-
-        along_u = geom.project(pt)         # metros u → P
-        along_v = geom.length - along_u    # metros v → P
-        d_perp = geom.distance(pt)         # perpendicular real
-        building_edges[i] = (u, v, along_u, along_v, d_perp)
-
-    # ── Dijkstra desde cada candidato + fórmula interpolada ──
-    distances: dict[int, dict[int, float]] = {idx: {} for idx in candidates.keys()}
-    for c_idx, c_node in idx_to_j.items():
-        reachable = nx.single_source_dijkstra_path_length(
-            graph_utm, c_node, cutoff=cutoff_m, weight="length",
-        )
-        for b_idx, (u, v, along_u, along_v, d_perp) in building_edges.items():
-            dist_via_u = reachable.get(u, float("inf")) + along_u
-            dist_via_v = reachable.get(v, float("inf")) + along_v
-            best = min(dist_via_u, dist_via_v) + d_perp
-            if best <= cutoff_m:
-                distances[c_idx][b_idx] = best
-    return distances
-
-
-def evaluate_coverage(
-    buildings: dict[int, BuildingData],
-    dij: dict[int, dict[int, float]],
-    params: ModelParameters,
-) -> dict[int, list[int]]:
-    """Return {building_idx: [waste_types without coverage]}.
-    
-    Empty dict means full coverage — no midpoint candidates needed.
-    """
-    reachable_from_building: dict[int, dict[int, float]] = {
-        i: {} for i in buildings
-    }
-
-    for j_idx, building_distances in dij.items():
-        for i_idx, dist in building_distances.items():
-            reachable_from_building[i_idx][j_idx] = dist
-
-    uncovered: dict[int, list[int]] = {}
-    for i_idx in buildings:
-        missing_types: list[int] = []
-        for k, r_k in params.coverage_radius.items():
-            covered = any(
-                dist <= r_k
-                for dist in reachable_from_building[i_idx].values()
-            )
-            if not covered:
-                missing_types.append(k)
-        if missing_types:
-            uncovered[i_idx] = missing_types
-
-    return uncovered
-
-
-def ensure_coverage(
-    graph: nx.MultiDiGraph,
-    buildings: dict[int, BuildingData],
-    candidates: dict[int, CandidateData],
-    dij: dict[int, dict[int, float]],
-    params: ModelParameters,
-    idx_to_j: dict[int, int],
-    j_to_idx: dict[int, int],
-    cutoff_m: float,
-) -> tuple[
-    dict[int, BuildingData],
-    dict[int, CandidateData],
-    dict[int, dict[int, float]],
-    dict[int, int],
-    dict[int, int],
-]:
-    """Guarantee full coverage of every building.
-
-    Adds an artificial STREET candidate at the nearest graph node to each
-    uncovered building, recomputes distances, and drops any building that
-    still cannot be covered. Returns the (possibly modified) buildings,
-    candidates, distances and candidate index maps.
-    """
-    # --- Paso A: identificar edificios sin cobertura ---
-    uncovered = evaluate_coverage(buildings, dij, params)
-    if not uncovered:
-        return buildings, candidates, dij, idx_to_j, j_to_idx
-
-    # --- Paso B: añadir candidato artificial junto a cada edificio sin cobertura ---
-    node_coords = {n: (data["y"], data["x"]) for n, data in graph.nodes(data=True)}
-    next_j_idx = max(candidates.keys()) + 1 if candidates else 0
-
-    added = 0
-    for b_idx in uncovered:
-        b = buildings[b_idx]
-        # Encontrar el nodo del grafo más cercano que no sea ya candidato
-        best_node, best_dist = None, float("inf")
-        for node_id, (lat, lon) in node_coords.items():
-            if node_id in j_to_idx:
-                continue
-            d = math.sqrt((b.latitude - lat) ** 2 + (b.longitude - lon) ** 2)
-            d_m = d * 111_320 * math.cos(math.radians(b.latitude))
-            if d_m < best_dist:
-                best_dist = d_m
-                best_node = node_id
-
-        if best_node is not None:
-            lat, lon = node_coords[best_node]
-            candidates[next_j_idx] = CandidateData(
-                osm_id=str(best_node),
-                latitude=lat,
-                longitude=lon,
-                context=CandidateContext.STREET,
-            )
-            idx_to_j[next_j_idx] = best_node
-            j_to_idx[best_node] = next_j_idx
-            next_j_idx += 1
-            added += 1
-
-    # --- Paso C: recomputar distancias con los nuevos candidatos ---
-    if added > 0:
-        dij = compute_distances(graph, buildings, candidates, idx_to_j, cutoff_m)
-
-    # --- Paso D: reevaluar cobertura ---
-    uncovered = evaluate_coverage(buildings, dij, params)
-
-    # --- Paso E: eliminar edificios aún inalcanzables y re-indexar ---
-    if uncovered:
-        # Re-indexar contiguamente para no dejar huecos en los índices de edificio
-        old_to_new: dict[int, int] = {
-            old_idx: new_idx
-            for new_idx, old_idx in enumerate(
-                sorted(i for i in buildings if i not in uncovered)
-            )
-        }
-        new_buildings: dict[int, BuildingData] = {
-            new_idx: buildings[old_idx]
-            for old_idx, new_idx in old_to_new.items()
-        }
-        dij = {
-            j: {
-                old_to_new[i]: dist
-                for i, dist in building_distances.items()
-                if i in old_to_new
-            }
-            for j, building_distances in dij.items()
-        }
-        buildings = new_buildings
-        print(f"Removed {len(uncovered)} unreachable buildings from instance")
-
-    return buildings, candidates, dij, idx_to_j, j_to_idx
-
-
-def add_midpoint_candidates(
-    graph: nx.MultiDiGraph,
-    candidates: dict[int, CandidateData],
-    idx_to_j: dict[int, int],
-    j_to_idx: dict[int, int],
-    min_segment_length_m: float = 75.0,
-) -> tuple[dict[int, CandidateData], dict[int, int], dict[int, int]]:
-    """Add midpoint candidates on long segments without nearby candidates."""
-
-    candidate_osm_nodes: set[int] = set(idx_to_j.values())
-
-    new_candidates = dict(candidates)
-    new_idx_to_j = dict(idx_to_j)
-    new_j_to_idx = dict(j_to_idx)
-    next_idx = max(candidates.keys()) + 1
-    next_virtual_id = -1  # IDs negativos para nodos virtuales
-
-    for u, v, data in graph.edges(data=True):
-        length = data.get("length", 0.0)
-        if length <= min_segment_length_m:
-            continue
-        if u in candidate_osm_nodes or v in candidate_osm_nodes:
-            continue
-
-        # Compute midpoint
-        geom = data.get("geometry")
-        if geom:
-            midpoint = geom.interpolate(0.5, normalized=True)
-            lat, lon = midpoint.y, midpoint.x
-        else:
-            lat = (graph.nodes[u]["y"] + graph.nodes[v]["y"]) / 2
-            lon = (graph.nodes[u]["x"] + graph.nodes[v]["x"]) / 2
-
-        osm_id = f"midpoint_{u}_{v}"
-        new_candidates[next_idx] = CandidateData(
-            osm_id=osm_id,
-            latitude=lat,
-            longitude=lon,
-            context=CandidateContext.STREET,
-        )
-        new_idx_to_j[next_idx] = next_virtual_id
-        new_j_to_idx[next_virtual_id] = next_idx
-        next_idx += 1
-        next_virtual_id -= 1
-
-    return new_candidates, new_idx_to_j, new_j_to_idx
+# ── Fachada del paquete: re-exporta la API pública de los submódulos ──────
+# build_instance / save_instance viven aquí; el resto del pipeline vive en los
+# módulos hermanos. Re-exportarlos desde `generador` permite seguir haciendo
+# `from generador import download_graph, ...` (notebooks) sin acoplar a la
+# estructura interna de módulos.
+from generador_grafo import (
+    download_graph,
+    project_to_utm,
+    insert_point_on_edge,
+)
+from generador_extraccion import (
+    cost_by_degree,
+    extract_candidates,
+    classify_candidate_context,
+    consolidate_candidates,
+    extract_buildings,
+)
+from generador_distancias import (
+    compute_distances,
+    evaluate_coverage,
+    ensure_coverage,
+)
 
 
 def build_instance(
@@ -514,7 +74,7 @@ def build_instance(
     idx_to_j: dict[int, int],
     dij: dict[int, dict[int, float]],
 ) -> Instance:
-    """Assemble all components into a complete Instance object."""
+    """Ensambla todos los componentes en un objeto Instance completo."""
     return Instance(
         # --- Metadata ---
         study_case=config.place,
@@ -548,6 +108,7 @@ def build_instance(
         # --- Parameters ---
         params=params,
     )
+
 
 def save_instance(instance: Instance, path: str) -> None:
     """Serialise an Instance to JSON following the project schema."""
@@ -597,6 +158,7 @@ def save_instance(instance: Instance, path: str) -> None:
                     "latitude": c.latitude,
                     "longitude": c.longitude,
                     "context": c.context.value,
+                    "opening_cost": c.opening_cost,
                 }
                 for idx, c in instance.J.items()
             },
@@ -617,7 +179,11 @@ def save_instance(instance: Instance, path: str) -> None:
 
 if __name__ == "__main__":
     import sys
-    from instancia import ModelParameters
+
+    import osmnx as ox
+    from shapely.geometry.base import BaseGeometry
+
+    # Las funciones del pipeline ya están importadas como fachada arriba.
 
     # Radio como argumento: python3 generador.py 750
     radius = int(sys.argv[1]) if len(sys.argv) > 1 else 500
@@ -626,9 +192,10 @@ if __name__ == "__main__":
         place="Plaza del Cristo, San Cristóbal de La Laguna, España",
         radius=radius,
         network_type="walk",
-        cutoff_dijkstra=250,
-        min_node_degree=3,
+        cutoff_dijkstra=350,
+        min_node_degree=2,
         graph_margin=100,
+        base_opening_cost=4000.0,
     )
 
     params = ModelParameters(
@@ -639,7 +206,7 @@ if __name__ == "__main__":
         overflow_penalty=500.0,
         bin_cost={0: 350.0, 1: 300.0, 2: 250.0, 3: 500.0},
         bin_capacity={0: 120.0, 1: 120.0, 2: 120.0, 3: 120.0},
-        coverage_radius={0: 100.0, 1: 100.0, 2: 150.0, 3: 250.0},
+        coverage_radius={0: 100.0, 1: 100.0, 2: 100.0, 3: 250.0},
         waste_proportion={0: 0.5012, 1: 0.0791, 2: 0.3885, 3: 0.0312},
         collection_frequency={0: 1.0, 1: 1.0, 2: 1.0, 3: 1.0},
         lognormal_mu=0.0,
@@ -651,24 +218,23 @@ if __name__ == "__main__":
     graph = download_graph(config)
     print(f"          Nodes: {graph.number_of_nodes()}  Edges: {graph.number_of_edges()}")
 
-    # Grafo UTM SOLO para compute_distances
-    graph_utm = ox.project_graph(graph)
+    # Grafo UTM SOLO para compute_distances / ensure_coverage.
+    graph_utm = project_to_utm(graph)
 
-    # Guardar el grafo lat/lon para mapas
+    # Guardar el grafo lat/lon para mapas.
     graph_path = f"data/processed/graph_{radius}m.graphml"
     ox.save_graphml(graph, graph_path)          # ← graph, NO graph_utm
     print(f"          Graph saved: {graph_path}")
 
     print("Step 2/7 — Extracting candidates...")
-    candidates, idx_to_j, j_to_idx = extract_candidates(graph, config)   # ← graph
+    candidates, idx_to_j, j_to_idx = extract_candidates(graph, config)
     print(f"          Candidates: {len(candidates)}")
 
     print("Step 3/7 — Extracting buildings...")
-    buildings, i_to_idx, idx_to_i, gdf_buildings = extract_buildings(config)
+    buildings, idx_to_i, i_to_idx, gdf_buildings = extract_buildings(config)
     print(f"          Buildings: {len(buildings)}")
 
-    # Limpiar columnas problemáticas para GeoJSON
-    from shapely.geometry.base import BaseGeometry
+    # Limpiar columnas problemáticas para GeoJSON (listas/dicts/geometrías → str).
     for col in gdf_buildings.columns:
         if col != "geometry":
             if gdf_buildings[col].apply(
@@ -692,10 +258,11 @@ if __name__ == "__main__":
 
     # ── Step 6b: Garantizar cobertura total ──────────────────
     buildings, candidates, dij, idx_to_j, j_to_idx = ensure_coverage(
-        graph_utm, buildings, candidates, dij, params,
+        graph_utm,      # UTM → compute_distances / proyecciones
+        buildings, candidates, dij, params,
         idx_to_j, j_to_idx, config.cutoff_dijkstra,
     )
-    # Actualizar mapas de edificios por si se eliminaron edificios inalcanzables
+    # Actualizar mapas de edificios por si se eliminaron edificios inalcanzables.
     idx_to_i = {idx: osm for idx, osm in idx_to_i.items() if idx in buildings}
     i_to_idx = {osm: idx for idx, osm in idx_to_i.items()}
 
@@ -704,7 +271,7 @@ if __name__ == "__main__":
     if uncovered:
         print(f"          ⚠ {len(uncovered)} buildings without full coverage")
     else:
-        print(f"          ✓ Full coverage")
+        print("          ✓ Full coverage")
 
     instance = build_instance(
         config, params, buildings, candidates,
