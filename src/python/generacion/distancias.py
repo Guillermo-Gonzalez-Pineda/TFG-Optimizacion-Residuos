@@ -34,8 +34,8 @@ from instancia import (
     CandidateData,
     ModelParameters,
 )
-from generador_grafo import insert_point_on_edge
-from generador_extraccion import cost_by_degree
+from .grafo import insert_point_on_edge
+from .extraccion import cost_by_degree
 
 
 # ══════════════════════════════════════════════════════════════════════

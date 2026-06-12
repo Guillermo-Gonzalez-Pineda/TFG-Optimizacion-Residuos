@@ -1,7 +1,7 @@
 """
 Extracción de candidatos y edificios (módulo 2/4 del generador).
 
-¿POR QUÉ EXISTE? Una vez tenemos el grafo de calles (módulo generador_grafo),
+¿POR QUÉ EXISTE? Una vez tenemos el grafo de calles (módulo grafo),
 hay que sacar de OSM los dos conjuntos del problema de localización:
 
     - CANDIDATOS (J): puntos donde PODRÍA ir un contenedor. Salen de los nodos de
@@ -12,7 +12,7 @@ hay que sacar de OSM los dos conjuntos del problema de localización:
       extract_buildings.
 
 Todo aquí trabaja en lat/lon (EPSG:4326); las distancias en metros son cosa del
-módulo generador_distancias.
+módulo distancias.
 
 Referencias:
     Li et al. (2026). Waste Management 209, 115211.

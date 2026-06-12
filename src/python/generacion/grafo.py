@@ -11,7 +11,7 @@ relativo al grafo en sí:
                              el sistema en el que se miden distancias.
     3. insert_point_on_edge— "materializa" un punto en mitad de una calle como un
                              nodo nuevo del grafo, partiendo la arista que lo
-                             contiene. Lo usa generador_distancias para colocar
+                             contiene. Lo usa el módulo distancias para colocar
                              contenedores artificiales justo enfrente de un
                              edificio.
 
