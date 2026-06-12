@@ -261,15 +261,61 @@ def consolidate_candidates(
 #  Edificios: extracción y estimación de población
 # ══════════════════════════════════════════════════════════════════════
 
+# Densidad poblacional oficial del núcleo urbano de La Laguna, usada para anclar
+# la demanda TOTAL a un dato real: 4.471 hab/km² (INE 2025, núcleo urbano de
+# 31.660 hab). El reparto entre edificios sale de la geometría (huella × plantas),
+# pero la suma se calibra a esta densidad para no inventar población.
+DENSIDAD_NUCLEO: float = 4471.0
+
+# Plantas por defecto cuando OSM no informa building:levels. En el casco
+# histórico de La Laguna lo típico son 2 plantas (planta baja + una), así que es
+# un supuesto conservador y razonable para los edificios sin etiquetar.
+_DEFAULT_LEVELS: int = 2
+
+
+def _parse_levels(value, default: int = _DEFAULT_LEVELS) -> int:
+    """Parsea el tag OSM `building:levels` a un nº de plantas entero y acotado.
+
+    El tag es texto libre en OSM y llega de cualquier forma: ausente (NaN), como
+    string ("3"), decimal ("3.5"), con varios valores ("2;4") o como basura. La
+    estrategia es robusta: tomar el primer número parseable y, si no lo hay, usar
+    `default`. Se acota a [1, 10] para descartar erratas evidentes (un "50" mal
+    puesto dispararía la demanda de un solo edificio).
+    """
+    try:
+        if isinstance(value, float) and math.isnan(value):
+            return default
+        # ";" separa valores múltiples; "," se usa como decimal en algunos sitios.
+        token = str(value).strip().replace(",", ".").split(";")[0]
+        levels = int(round(float(token)))
+    except (ValueError, TypeError, AttributeError):
+        return default
+    return max(1, min(10, levels))
+
+
 def extract_buildings(
     config: GeographicConfig,
     ref_surface_m2: float = 30.0,
 ) -> tuple[dict[int, BuildingData], dict[str, int], dict[int, str], gpd.GeoDataFrame]:
-    """Extrae los edificios de OSM y estima su población h_i por superficie.
+    """Extrae los edificios de OSM y estima su población h_i en tres pasos.
 
-    ¿POR QUÉ por superficie? No hay censo por edificio; aproximamos la demanda
-    con el área construida: h_i = area / ref_surface_m2 (mínimo 1 habitante). El
-    área se mide en UTM (m²); el centroide se reproyecta a lat/lon para el mapa.
+    ¿POR QUÉ no basta con la huella? No hay censo por edificio, así que la demanda
+    se aproxima a partir de la geometría. Pero la huella sola ignora la altura (un
+    edificio de 5 plantas aloja ~5× lo que sugiere su planta) y, sumada, sobre-
+    estima la población real del núcleo (~2.5× el dato del INE). Por eso:
+
+        1. VOLUMEN CONSTRUIDO. h_i_cruda = (área_huella × plantas) / ref_surface_m2.
+           Las plantas salen del tag OSM `building:levels` (2 por defecto, casco
+           histórico de La Laguna). El área se mide en UTM (m²); mínimo 1 hab.
+        2. CALIBRACIÓN A DENSIDAD OFICIAL. La suma de h_i_cruda no tiene por qué
+           coincidir con la población real, así que se reescala. La población
+           objetivo de la zona = área del convex hull de los edificios (km²) ×
+           DENSIDAD_NUCLEO (INE 2025). Factor = objetivo / suma_cruda.
+        3. DEMANDA FINAL. h_i = h_i_cruda × factor (mínimo 1 hab). El reparto
+           relativo lo fija la geometría; el TOTAL queda anclado al dato del INE.
+
+    El centroide se calcula en UTM (evita el aviso de shapely sobre centroides en
+    lat/lon) y se reproyecta a EPSG:4326 para el mapa.
 
     Recibe configuración y la superficie de referencia por habitante.
     Devuelve:
@@ -286,15 +332,42 @@ def extract_buildings(
         buildings_gdf.geometry.type.isin(["Polygon", "MultiPolygon"])
     ].copy()
 
-    # ── BLOQUE 2 — Área (UTM) → h_i, y centroide (lat/lon) ────────────
+    # ── BLOQUE 2 — Volumen construido (huella × plantas) → h_i_cruda ───
     # El área debe medirse en metros, así que pasamos a UTM. El centroide se
-    # calcula en UTM (evita el aviso de shapely sobre centroides en lat/lon) y se
-    # reproyecta a EPSG:4326 para tener su coordenada geográfica.
+    # calcula también en UTM y se reproyecta a EPSG:4326 para el mapa.
     buildings_utm = buildings_gdf.to_crs(buildings_gdf.estimate_utm_crs())
     buildings_utm["centroid"] = buildings_utm.geometry.centroid
     buildings_gdf["area_m2"] = buildings_utm.geometry.area
-    buildings_gdf["h_i"] = (buildings_gdf["area_m2"] / ref_surface_m2).clip(lower=1.0)
     buildings_gdf["centroid"] = buildings_utm["centroid"].to_crs("EPSG:4326")
+
+    # Plantas desde building:levels. Si la columna no existe en absoluto (OSM no
+    # trajo el tag para ningún edificio), todos usan el valor por defecto.
+    if "building:levels" in buildings_gdf.columns:
+        buildings_gdf["plantas"] = buildings_gdf["building:levels"].apply(_parse_levels)
+    else:
+        buildings_gdf["plantas"] = _DEFAULT_LEVELS
+
+    buildings_gdf["h_i_cruda"] = (
+        buildings_gdf["area_m2"] * buildings_gdf["plantas"] / ref_surface_m2
+    ).clip(lower=1.0)
+
+    # ── BLOQUE 2b — Calibrar la suma a la densidad oficial (INE) ───────
+    # Área de la zona = convex hull de los centroides (en UTM → m² directos).
+    hull = unary_union(buildings_utm["centroid"].values).convex_hull
+    area_km2 = hull.area / 1e6
+    poblacion_objetivo = area_km2 * DENSIDAD_NUCLEO
+
+    suma_cruda = float(buildings_gdf["h_i_cruda"].sum())
+    factor = poblacion_objetivo / suma_cruda if suma_cruda > 0 else 1.0
+    buildings_gdf["h_i"] = (buildings_gdf["h_i_cruda"] * factor).clip(lower=1.0)
+
+    # Resumen de trazabilidad de la calibración.
+    print("          ─ Calibración de demanda a densidad INE ─")
+    print(f"          Suma h_i cruda (huella×plantas/{ref_surface_m2:.0f}): {suma_cruda:,.0f}")
+    print(f"          Área convex hull:        {area_km2:.4f} km²")
+    print(f"          Población objetivo (INE): {poblacion_objetivo:,.0f} hab")
+    print(f"          Factor de calibración:   {factor:.4f}")
+    print(f"          Suma h_i calibrada:      {buildings_gdf['h_i'].sum():,.0f}")
 
     # ── BLOQUE 3 — Empaquetar en BuildingData con índices internos ────
     buildings: dict[int, BuildingData] = {}

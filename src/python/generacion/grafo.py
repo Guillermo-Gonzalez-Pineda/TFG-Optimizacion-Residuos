@@ -126,6 +126,14 @@ def download_graph(config: GeographicConfig) -> nx.MultiDiGraph:
     ]
     graph.remove_edges_from(edges_to_remove)
 
+    # ── Eliminar nodos aislados (grado 0) ─────────────────
+    # Tras filtrar calles no caminables, algunos nodos quedan sin ninguna
+    # arista (puntos fantasma de OSM sin acceso viario). No son candidatos
+    # válidos ni los usa Dijkstra, así que los retiramos para que el grafo
+    # quede conexo y limpio.
+    nodos_aislados = [n for n in graph.nodes if graph.degree(n) == 0]
+    graph.remove_nodes_from(nodos_aislados)
+
     return graph
 
 
