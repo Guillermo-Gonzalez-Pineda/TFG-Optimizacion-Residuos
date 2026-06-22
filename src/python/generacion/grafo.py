@@ -134,6 +134,32 @@ def download_graph(config: GeographicConfig) -> nx.MultiDiGraph:
     nodos_aislados = [n for n in graph.nodes if graph.degree(n) == 0]
     graph.remove_nodes_from(nodos_aislados)
 
+    # ── Conservar solo la componente conexa principal ─────────────────
+    # OSMnx a veces deja fragmentos sueltos: pequeños grupos de nodos
+    # conectados entre sí pero desconectados de la red principal. Aparecen
+    # sobre todo en el borde del radio de descarga (un trozo de calle cuya
+    # conexión al resto de la red queda fuera del radio + margen). Un
+    # contenedor o edificio que cayera sobre uno de esos fragmentos sería
+    # INALCANZABLE por Dijkstra desde el resto de la red, así que los
+    # descartamos. Es la misma filosofía que el borrado de nodos de grado 0:
+    # limpiar el grafo de elementos no útiles para el problema.
+    #
+    # Usamos componentes DÉBILMENTE conexas (weakly_connected_components):
+    # el grafo es dirigido, pero para la conectividad peatonal el sentido de
+    # las calles es irrelevante (casi todas son bidireccionales). Las
+    # componentes fuertemente conexas serían demasiado estrictas y partirían
+    # la red principal por calles de sentido único.
+    componentes = list(nx.weakly_connected_components(graph))
+    if len(componentes) > 1:
+        principal = max(componentes, key=len)
+        descartados = [n for comp in componentes if comp is not principal for n in comp]
+        graph.remove_nodes_from(descartados)
+        print(
+            f"  [grafo] Eliminados {len(descartados)} nodos de "
+            f"{len(componentes) - 1} fragmento(s) desconectado(s); "
+            f"conservada la componente principal ({len(principal)} nodos)."
+        )
+
     return graph
 
 

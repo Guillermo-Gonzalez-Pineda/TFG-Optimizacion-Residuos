@@ -2602,7 +2602,7 @@
     <edge source="919596748" target="919596745" id="0">
       <data key="d8">[78823016, 78331205]</data>
       <data key="d9">residential</data>
-      <data key="d11">['Calle José Rodríguez Ramírez', 'Calle Barranco de Gonzaliánez']</data>
+      <data key="d11">['Calle Barranco de Gonzaliánez', 'Calle José Rodríguez Ramírez']</data>
       <data key="d12">False</data>
       <data key="d13">True</data>
       <data key="d14">112.64673396576214</data>
@@ -3482,7 +3482,7 @@
     <edge source="974696592" target="13115997328" id="0">
       <data key="d8">[201544092, 201544111]</data>
       <data key="d9">residential</data>
-      <data key="d11">['Calle Aguamansa', 'Calle Picachos']</data>
+      <data key="d11">['Calle Picachos', 'Calle Aguamansa']</data>
       <data key="d12">False</data>
       <data key="d13">True</data>
       <data key="d14">91.31379383642971</data>
@@ -4160,15 +4160,6 @@
       <data key="d16">3.5</data>
       <data key="d13">False</data>
       <data key="d14">135.24720948622345</data>
-    </edge>
-    <edge source="1351902064" target="13197399524" id="0">
-      <data key="d8">[50761458, 43651959]</data>
-      <data key="d9">['residential', 'track']</data>
-      <data key="d12">False</data>
-      <data key="d13">True</data>
-      <data key="d14">187.86445647928892</data>
-      <data key="d11">Calle Pista Militar San Roque</data>
-      <data key="d15">LINESTRING (-16.3083694 28.4891394, -16.3083084 28.4892003, -16.3083735 28.4894186, -16.3083112 28.4895413, -16.3081545 28.4897923, -16.3080277 28.4899169, -16.3079698 28.4899717, -16.3079698 28.490017, -16.3079977 28.490083, -16.3080707 28.4901236, -16.3081851 28.4900915, -16.3082937 28.4900126, -16.3083456 28.490025, -16.3083612 28.4900807, -16.3082946 28.4902312, -16.3082965 28.4902641)</data>
     </edge>
     <edge source="1404433179" target="552139318" id="0">
       <data key="d8">43651938</data>
@@ -5300,7 +5291,7 @@
     <edge source="13115997328" target="974696592" id="0">
       <data key="d8">[201544092, 201544111]</data>
       <data key="d9">residential</data>
-      <data key="d11">['Calle Aguamansa', 'Calle Picachos']</data>
+      <data key="d11">['Calle Picachos', 'Calle Aguamansa']</data>
       <data key="d12">False</data>
       <data key="d13">False</data>
       <data key="d14">91.31379383642971</data>
@@ -5515,7 +5506,7 @@
       <data key="d13">False</data>
       <data key="d14">4.913741050000459</data>
     </edge>
-    <data key="d0">2026-06-12 15:54:46</data>
+    <data key="d0">2026-06-22 15:27:44</data>
     <data key="d1">OSMnx 2.1.0</data>
     <data key="d2">epsg:4326</data>
     <data key="d3">True</data>

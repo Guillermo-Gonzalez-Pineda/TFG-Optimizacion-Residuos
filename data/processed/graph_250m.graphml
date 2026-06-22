@@ -1393,7 +1393,7 @@
     <edge source="919596737" target="919596735" id="0">
       <data key="d8">[78331169, 78823011]</data>
       <data key="d9">residential</data>
-      <data key="d11">['Calle Barranco de Gonzaliánez', 'Avenida de la República Argentina']</data>
+      <data key="d11">['Avenida de la República Argentina', 'Calle Barranco de Gonzaliánez']</data>
       <data key="d12">False</data>
       <data key="d13">True</data>
       <data key="d14">94.23074075632216</data>
@@ -1846,7 +1846,7 @@
     </edge>
     <edge source="966281922" target="13873595111" id="0">
       <data key="d8">[83059433, 83059429]</data>
-      <data key="d9">['service', 'steps']</data>
+      <data key="d9">['steps', 'service']</data>
       <data key="d11">Pedro Pinto de la Rosa</data>
       <data key="d19">alley</data>
       <data key="d12">False</data>
@@ -2952,7 +2952,7 @@
     </edge>
     <edge source="13873595111" target="966281922" id="0">
       <data key="d8">[83059433, 83059429]</data>
-      <data key="d9">['service', 'steps']</data>
+      <data key="d9">['steps', 'service']</data>
       <data key="d12">False</data>
       <data key="d13">True</data>
       <data key="d14">31.325945995035227</data>
@@ -2967,7 +2967,7 @@
       <data key="d13">False</data>
       <data key="d14">4.913741050000459</data>
     </edge>
-    <data key="d0">2026-06-12 15:54:43</data>
+    <data key="d0">2026-06-22 15:27:28</data>
     <data key="d1">OSMnx 2.1.0</data>
     <data key="d2">epsg:4326</data>
     <data key="d3">True</data>
