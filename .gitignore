@@ -29,7 +29,6 @@ cache/
 
 # Formatos geoespaciales pesados
 *.gpkg
-*.geojson
 
 # Datos procesados intermedios (opcional — decide tú)
 # data/processed/
