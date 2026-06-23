@@ -1,0 +1,873 @@
+python3 src/python/modelo_exacto.py data/processed/instancia_laguna_250m.json
+=================================================================
+  Exact HDM — Gurobi MIP
+=================================================================
+  Instance: Plaza del Cristo, San Cristóbal de La Laguna, España
+  Buildings: 243  Candidates: 80
+  Valid y-variables: 7005
+-----------------------------------------------------------------
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2827120
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Set parameter TimeLimit to value 10800
+Set parameter LogFile to value "output/gurobi_run.log"
+Gurobi Optimizer version 11.0.3 build v11.0.3rc0 (linux64 - "Ubuntu 20.04.6 LTS")
+
+CPU model: AMD Ryzen 7 5800H with Radeon Graphics, instruction set [SSE2|AVX|AVX2]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Optimize a model with 51463 rows, 7725 columns and 114951 nonzeros
+Model fingerprint: 0xb393d66b
+Variable types: 0 continuous, 7725 integer (7405 binary)
+Coefficient statistics:
+  Matrix range     [1e-02, 1e+02]
+  Objective range  [2e+02, 5e+03]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve removed 46250 rows and 2513 columns
+Presolve time: 2.27s
+Presolved: 5213 rows, 5212 columns, 49298 nonzeros
+Variable types: 0 continuous, 5212 integer (5212 binary)
+Found heuristic solution: objective 243750.00000
+Found heuristic solution: objective 209650.00000
+
+Root relaxation: objective 1.173690e+05, 3589 iterations, 0.29 seconds (0.18 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 117368.987    0  675 209650.000 117368.987  44.0%     -    3s
+     0     0 119566.603    0  606 209650.000 119566.603  43.0%     -    3s
+H    0     0                    203000.00000 119566.603  41.1%     -    3s
+H    0     0                    167600.00000 119566.603  28.7%     -    3s
+H    0     0                    155750.00000 119566.603  23.2%     -    3s
+H    0     0                    153500.00000 119566.603  22.1%     -    3s
+     0     0 119696.469    0  564 153500.000 119696.469  22.0%     -    3s
+     0     0 142578.397    0   76 153500.000 142578.397  7.12%     -    6s
+     0     0 142588.137    0   77 153500.000 142588.137  7.11%     -    6s
+H    0     0                    146700.00000 142588.137  2.80%     -    6s
+H    0     0                    146450.00000 143191.398  2.23%     -    6s
+     0     0 146128.883    0  585 146450.000 146128.883  0.22%     -    7s
+     0     0 146250.000    0  242 146450.000 146250.000  0.14%     -    7s
+H    0     0                    146250.00000 146250.000  0.00%     -    7s
+     0     0 146250.000    0  242 146250.000 146250.000  0.00%     -    7s
+
+Cutting planes:
+  Gomory: 2
+  Cover: 5
+  Clique: 78
+  MIR: 3
+  GUB cover: 2
+  Zero half: 1
+  RLT: 3
+  PSD: 1
+
+Explored 1 nodes (11854 simplex iterations) in 7.50 seconds (2.80 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 10: 146250 146450 146700 ... 243750
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 1.462500000000e+05, best bound 1.462500000000e+05, gap 0.0000%
+-----------------------------------------------------------------
+  Optimal cost:  146,250.0
+  Gurobi gap:    0.0000%
+  Runtime:       7.5s
+  Points open:   29
+  Total bins:    80
+  ✅ Pickle guardado y verificado: output/exacto_250m/solucion_exacta.pkl
+  ✅ Resumen JSON:                 output/exacto_250m/solucion_exacta_resumen.json
+     Contenido del pickle:
+       z:        80 entries
+       x:        320 entries
+       w:        320 entries
+       y_assign: 972 entries
+=================================================================
+
+
+python3 src/python/modelo_exacto.py data/processed/instancia_laguna_300m.json
+=================================================================
+  Exact HDM — Gurobi MIP
+=================================================================
+  Instance: Plaza del Cristo, San Cristóbal de La Laguna, España
+  Buildings: 346  Candidates: 102
+  Valid y-variables: 9317
+-----------------------------------------------------------------
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2827120
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Set parameter TimeLimit to value 10800
+Set parameter LogFile to value "output/gurobi_run.log"
+Gurobi Optimizer version 11.0.3 build v11.0.3rc0 (linux64 - "Ubuntu 20.04.6 LTS")
+
+CPU model: AMD Ryzen 7 5800H with Radeon Graphics, instruction set [SSE2|AVX|AVX2]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Optimize a model with 59191 rows, 10235 columns and 134223 nonzeros
+Model fingerprint: 0xead254c7
+Variable types: 0 continuous, 10235 integer (9827 binary)
+Coefficient statistics:
+  Matrix range     [1e-02, 1e+02]
+  Objective range  [2e+02, 5e+03]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve removed 52310 rows and 3368 columns
+Presolve time: 2.93s
+Presolved: 6881 rows, 6867 columns, 58952 nonzeros
+Variable types: 0 continuous, 6867 integer (6864 binary)
+Found heuristic solution: objective 316650.00000
+
+Root relaxation: objective 1.724186e+05, 6343 iterations, 0.60 seconds (0.34 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 172418.564    0 1052 316650.000 172418.564  45.5%     -    5s
+     0     0 174805.217    0 1076 316650.000 174805.217  44.8%     -    5s
+H    0     0                    239300.00000 174805.217  27.0%     -    5s
+H    0     0                    231300.00000 174805.217  24.4%     -    5s
+H    0     0                    214750.00000 174805.217  18.6%     -    5s
+     0     0 175049.778    0  995 214750.000 175049.778  18.5%     -    5s
+     0     0 202257.289    0  247 214750.000 202257.289  5.82%     -    8s
+     0     0 202385.532    0  128 214750.000 202385.532  5.76%     -    8s
+H    0     0                    206700.00000 202385.532  2.09%     -    8s
+     0     0 206458.774    0  266 206700.000 206458.774  0.12%     -    9s
+*    0     0               0    206500.00000 206500.000  0.00%     -    9s
+
+Cutting planes:
+  Gomory: 6
+  Cover: 6
+  Clique: 118
+  MIR: 5
+  GUB cover: 6
+  RLT: 6
+  BQP: 6
+
+Explored 1 nodes (18426 simplex iterations) in 9.38 seconds (3.54 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 6: 206500 206700 214750 ... 316650
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.065000000000e+05, best bound 2.065000000000e+05, gap 0.0000%
+-----------------------------------------------------------------
+  Optimal cost:  206,500.0
+  Gurobi gap:    0.0000%
+  Runtime:       9.4s
+  Points open:   40
+  Total bins:    113
+  ✅ Pickle guardado y verificado: output/exacto_300m/solucion_exacta.pkl
+  ✅ Resumen JSON:                 output/exacto_300m/solucion_exacta_resumen.json
+     Contenido del pickle:
+       z:        102 entries
+       x:        408 entries
+       w:        408 entries
+       y_assign: 1384 entries
+=================================================================
+
+
+
+python3 src/python/modelo_exacto.py data/processed/instancia_laguna_350m.json
+=================================================================
+  Exact HDM — Gurobi MIP
+=================================================================
+  Instance: Plaza del Cristo, San Cristóbal de La Laguna, España
+  Buildings: 446  Candidates: 116
+  Valid y-variables: 11835
+-----------------------------------------------------------------
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2827120
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Set parameter TimeLimit to value 10800
+Set parameter LogFile to value "output/gurobi_run.log"
+Gurobi Optimizer version 11.0.3 build v11.0.3rc0 (linux64 - "Ubuntu 20.04.6 LTS")
+
+CPU model: AMD Ryzen 7 5800H with Radeon Graphics, instruction set [SSE2|AVX|AVX2]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Optimize a model with 74893 rows, 12879 columns and 169827 nonzeros
+Model fingerprint: 0x408a1af3
+Variable types: 0 continuous, 12879 integer (12415 binary)
+Coefficient statistics:
+  Matrix range     [1e-02, 1e+02]
+  Objective range  [2e+02, 5e+03]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve removed 66138 rows and 4137 columns
+Presolve time: 3.54s
+Presolved: 8755 rows, 8742 columns, 74706 nonzeros
+Variable types: 0 continuous, 8742 integer (8735 binary)
+Found heuristic solution: objective 401250.00000
+
+Root relaxation: objective 2.152076e+05, 6559 iterations, 0.75 seconds (0.43 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 215207.621    0 1319 401250.000 215207.621  46.4%     -    6s
+     0     0 218278.782    0 1326 401250.000 218278.782  45.6%     -    6s
+     0     0 218495.631    0 1293 401250.000 218495.631  45.5%     -    6s
+H    0     0                    313650.00000 218495.631  30.3%     -    6s
+H    0     0                    309650.00000 218495.631  29.4%     -    6s
+H    0     0                    291650.00000 218495.631  25.1%     -    6s
+H    0     0                    291600.00000 218495.631  25.1%     -    7s
+H    0     0                    275550.00000 218495.631  20.7%     -    7s
+     0     0 219100.044    0 1267 275550.000 219100.044  20.5%     -    7s
+     0     0 251212.482    0  290 275550.000 251212.482  8.83%     -   11s
+     0     0 251431.236    0  263 275550.000 251431.236  8.75%     -   11s
+     0     0 251435.037    0  254 275550.000 251435.037  8.75%     -   11s
+H    0     0                    268500.00000 251435.037  6.36%     -   11s
+H    0     0                    259950.00000 251435.037  3.28%     -   11s
+H    0     0                    255750.00000 251435.037  1.69%     -   11s
+     0     0 255457.562    0  797 255750.000 255457.562  0.11%     -   13s
+     0     0 255540.510    0  297 255750.000 255540.510  0.08%     -   13s
+     0     0 255543.718    0  287 255750.000 255543.718  0.08%     -   13s
+     0     0 255550.579    0  205 255750.000 255550.579  0.08%     -   13s
+     0     0 255550.760    0  188 255750.000 255550.760  0.08%     -   13s
+     0     0 255675.268    0  814 255750.000 255675.268  0.03%     -   14s
+     0     0 255675.268    0   33 255750.000 255675.268  0.03%     -   15s
+     0     0     cutoff    0      255750.000 255750.000  0.00%     -   15s
+
+Cutting planes:
+  Gomory: 2
+  Cover: 1
+  Clique: 19
+  MIR: 1
+  StrongCG: 2
+  BQP: 1
+
+Explored 1 nodes (26556 simplex iterations) in 15.50 seconds (5.86 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 10: 255750 255750 255950 ... 313650
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 2.557500000000e+05, best bound 2.557500000000e+05, gap 0.0000%
+-----------------------------------------------------------------
+  Optimal cost:  255,750.0
+  Gurobi gap:    0.0000%
+  Runtime:       15.5s
+  Points open:   49
+  Total bins:    138
+  ✅ Pickle guardado y verificado: output/exacto_350m/solucion_exacta.pkl
+  ✅ Resumen JSON:                 output/exacto_350m/solucion_exacta_resumen.json
+     Contenido del pickle:
+       z:        116 entries
+       x:        464 entries
+       w:        464 entries
+       y_assign: 1784 entries
+=================================================================
+
+
+
+python3 src/python/modelo_exacto.py data/processed/instancia_laguna_400m.json
+=================================================================
+  Exact HDM — Gurobi MIP
+=================================================================
+  Instance: Plaza del Cristo, San Cristóbal de La Laguna, España
+  Buildings: 546  Candidates: 148
+  Valid y-variables: 15335
+-----------------------------------------------------------------
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2827120
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Set parameter TimeLimit to value 10800
+Set parameter LogFile to value "output/gurobi_run.log"
+Gurobi Optimizer version 11.0.3 build v11.0.3rc0 (linux64 - "Ubuntu 20.04.6 LTS")
+
+CPU model: AMD Ryzen 7 5800H with Radeon Graphics, instruction set [SSE2|AVX|AVX2]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Optimize a model with 104909 rows, 16667 columns and 236036 nonzeros
+Model fingerprint: 0x87902130
+Variable types: 0 continuous, 16667 integer (16075 binary)
+Coefficient statistics:
+  Matrix range     [1e-02, 1e+02]
+  Objective range  [2e+02, 5e+03]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve removed 91017 rows and 3317 columns (presolve time = 5s) ...
+Presolve removed 92930 rows and 4735 columns
+Presolve time: 5.36s
+Presolved: 11979 rows, 11932 columns, 111039 nonzeros
+Variable types: 0 continuous, 11932 integer (11914 binary)
+Found heuristic solution: objective 503800.00000
+Deterministic concurrent LP optimizer: primal and dual simplex
+Showing primal log only...
+
+
+Root simplex log...
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+       0    2.8877105e+05   2.390043e+02   8.447342e+08      6s
+    3512    3.4829817e+05   0.000000e+00   3.578738e+06      6s
+Concurrent spin time: 0.14s (can be avoided by choosing Method=3)
+
+Solved with dual simplex
+
+Root simplex log...
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+    7167    2.7589107e+05   0.000000e+00   0.000000e+00      7s
+
+Root relaxation: objective 2.758911e+05, 7167 iterations, 1.39 seconds (0.68 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 275891.072    0 1718 503800.000 275891.072  45.2%     -   10s
+     0     0 279121.703    0 1747 503800.000 279121.703  44.6%     -   10s
+H    0     0                    355300.00000 279121.703  21.4%     -   10s
+H    0     0                    350350.00000 279121.703  20.3%     -   10s
+H    0     0                    346650.00000 279121.703  19.5%     -   10s
+H    0     0                    342900.00000 279121.703  18.6%     -   10s
+     0     0 281489.379    0 1675 342900.000 281489.379  17.9%     -   11s
+     0     0 325181.611    0 1032 342900.000 325181.611  5.17%     -   19s
+     0     0 325334.686    0 1221 342900.000 325334.686  5.12%     -   20s
+     0     0 325334.962    0  991 342900.000 325334.962  5.12%     -   20s
+H    0     0                    337400.00000 325334.962  3.58%     -   20s
+H    0     0                    337150.00000 325334.962  3.50%     -   20s
+H    0     0                    332350.00000 325334.962  2.11%     -   24s
+     0     0 326689.119    0 1444 332350.000 326689.119  1.70%     -   29s
+     0     0 326894.633    0 1429 332350.000 326894.633  1.64%     -   29s
+     0     0 326896.179    0 1428 332350.000 326896.179  1.64%     -   30s
+H    0     0                    327100.00000 326896.179  0.06%     -   30s
+     0     0     cutoff    0      327100.000 327100.000  0.00%     -   30s
+
+Cutting planes:
+  Learned: 12
+  Gomory: 3
+  Cover: 9
+  Implied bound: 3
+  Clique: 542
+  MIR: 5
+  StrongCG: 3
+  GUB cover: 3
+  Zero half: 26
+  RLT: 16
+  Relax-and-lift: 2
+  BQP: 23
+
+Explored 1 nodes (36233 simplex iterations) in 31.01 seconds (9.53 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 9: 327100 332350 337150 ... 503800
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 3.271000000000e+05, best bound 3.271000000000e+05, gap 0.0000%
+-----------------------------------------------------------------
+  Optimal cost:  327,100.0
+  Gurobi gap:    0.0000%
+  Runtime:       31.0s
+  Points open:   62
+  Total bins:    177
+  ✅ Pickle guardado y verificado: output/exacto_400m/solucion_exacta.pkl
+  ✅ Resumen JSON:                 output/exacto_400m/solucion_exacta_resumen.json
+     Contenido del pickle:
+       z:        148 entries
+       x:        592 entries
+       w:        592 entries
+       y_assign: 2184 entries
+=================================================================
+
+
+
+python3 src/python/modelo_exacto.py data/processed/instancia_laguna_450m.json
+=================================================================
+  Exact HDM — Gurobi MIP
+=================================================================
+  Instance: Plaza del Cristo, San Cristóbal de La Laguna, España
+  Buildings: 640  Candidates: 168
+  Valid y-variables: 17480
+-----------------------------------------------------------------
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2827120
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Set parameter TimeLimit to value 10800
+Set parameter LogFile to value "output/gurobi_run.log"
+Gurobi Optimizer version 11.0.3 build v11.0.3rc0 (linux64 - "Ubuntu 20.04.6 LTS")
+
+CPU model: AMD Ryzen 7 5800H with Radeon Graphics, instruction set [SSE2|AVX|AVX2]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Optimize a model with 116505 rows, 18992 columns and 262730 nonzeros
+Model fingerprint: 0x09538e30
+Variable types: 0 continuous, 18992 integer (18320 binary)
+Coefficient statistics:
+  Matrix range     [1e-02, 1e+02]
+  Objective range  [2e+02, 5e+03]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve removed 100792 rows and 3902 columns (presolve time = 5s) ...
+Presolve removed 103156 rows and 5679 columns
+Presolve time: 5.83s
+Presolved: 13349 rows, 13313 columns, 120516 nonzeros
+Variable types: 0 continuous, 13313 integer (13287 binary)
+Found heuristic solution: objective 618050.00000
+Deterministic concurrent LP optimizer: primal and dual simplex
+Showing primal log only...
+
+
+Root simplex log...
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+       0    3.4525000e+05   3.066227e+02   9.865395e+08      6s
+    3317    4.0553372e+05   0.000000e+00   2.734986e+05      7s
+Concurrent spin time: 0.19s (can be avoided by choosing Method=3)
+
+Solved with dual simplex
+
+Root simplex log...
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+    8845    3.2737436e+05   0.000000e+00   0.000000e+00      8s
+
+Root relaxation: objective 3.273744e+05, 8845 iterations, 1.91 seconds (0.87 work units)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 327374.361    0 1980 618050.000 327374.361  47.0%     -   15s
+     0     0 330926.207    0 2077 618050.000 330926.207  46.5%     -   16s
+H    0     0                    531700.00000 330926.207  37.8%     -   16s
+H    0     0                    416800.00000 330926.207  20.6%     -   16s
+H    0     0                    408600.00000 330926.207  19.0%     -   16s
+     0     0 333431.217    0 2063 408600.000 333431.217  18.4%     -   17s
+     0     0 378388.298    0 1720 408600.000 378388.298  7.39%     -   31s
+     0     0 378461.782    0 1934 408600.000 378461.782  7.38%     -   34s
+     0     0 379391.350    0 1819 408600.000 379391.350  7.15%     -   36s
+     0     0 379391.661    0 1819 408600.000 379391.661  7.15%     -   36s
+H    0     0                    402850.00000 379391.661  5.82%     -   36s
+H    0     0                    398050.00000 379391.661  4.69%     -   36s
+H    0     0                    397800.00000 379391.661  4.63%     -   36s
+     0     0 387588.847    0 1268 397800.000 387588.847  2.57%     -   44s
+     0     0 387618.094    0 1226 397800.000 387618.094  2.56%     -   44s
+     0     0 387619.343    0 1233 397800.000 387619.343  2.56%     -   44s
+H    0     0                    393350.00000 387620.670  1.46%     -   44s
+H    0     0                    392850.00000 387620.670  1.33%     -   44s
+     0     0 387663.710    0 1125 392850.000 387663.710  1.32%     -   44s
+     0     0 387663.804    0 1130 392850.000 387663.804  1.32%     -   45s
+H    0     0                    389550.00000 387663.804  0.48%     -   49s
+H    0     0                    389300.00000 387663.804  0.42%     -   49s
+     0     0 387952.097    0 1552 389300.000 387952.097  0.35%     -   50s
+     0     0 387952.097    0 1430 389300.000 387952.097  0.35%     -   56s
+     0     0 387952.097    0 1419 389300.000 387952.097  0.35%     -   56s
+     0     0 387952.097    0 1374 389300.000 387952.097  0.35%     -   61s
+     0     0 387952.097    0 1188 389300.000 387952.097  0.35%     -   61s
+     0     0 388048.563    0 1141 389300.000 388048.563  0.32%     -   62s
+     0     0 388048.563    0 1071 389300.000 388048.563  0.32%     -   62s
+     0     0 388057.110    0 1359 389300.000 388057.110  0.32%     -   62s
+     0     0 388057.110    0 1359 389300.000 388057.110  0.32%     -   62s
+     0     0 388057.110    0 1230 389300.000 388057.110  0.32%     -   62s
+     0     0 388250.000    0  855 389300.000 388250.000  0.27%     -   65s
+     0     0 388250.000    0  102 389300.000 388250.000  0.27%     -   65s
+H    0     0                    388500.00000 388250.000  0.06%     -   66s
+     0     0 388252.179    0 1754 388500.000 388252.179  0.06%     -   67s
+     0     0 388252.181    0 1211 388500.000 388252.181  0.06%     -   67s
+     0     0 388252.181    0  893 388500.000 388252.181  0.06%     -   67s
+     0     0 388375.000    0  164 388500.000 388375.000  0.03%     -   68s
+     0     0 388375.000    0    1 388500.000 388375.000  0.03%     -   69s
+     0     0     cutoff    0      388500.000 388500.000  0.00%     -   69s
+
+Explored 1 nodes (80871 simplex iterations) in 69.63 seconds (19.64 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 10: 388500 388500 388500 ... 393350
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 3.885000000000e+05, best bound 3.885000000000e+05, gap 0.0000%
+-----------------------------------------------------------------
+  Optimal cost:  388,500.0
+  Gurobi gap:    0.0000%
+  Runtime:       69.6s
+  Points open:   74
+  Total bins:    211
+  ✅ Pickle guardado y verificado: output/exacto_450m/solucion_exacta.pkl
+  ✅ Resumen JSON:                 output/exacto_450m/solucion_exacta_resumen.json
+     Contenido del pickle:
+       z:        168 entries
+       x:        672 entries
+       w:        672 entries
+       y_assign: 2560 entries
+=================================================================
+
+
+
+python3 src/python/modelo_exacto.py data/processed/instancia_laguna_500m.json
+=================================================================
+  Exact HDM — Gurobi MIP
+=================================================================
+  Instance: Plaza del Cristo, San Cristóbal de La Laguna, España
+  Buildings: 740  Candidates: 195
+  Valid y-variables: 20357
+-----------------------------------------------------------------
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2827120
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Set parameter TimeLimit to value 10800
+Set parameter LogFile to value "output/gurobi_run.log"
+Gurobi Optimizer version 11.0.3 build v11.0.3rc0 (linux64 - "Ubuntu 20.04.6 LTS")
+
+CPU model: AMD Ryzen 7 5800H with Radeon Graphics, instruction set [SSE2|AVX|AVX2]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Optimize a model with 137109 rows, 22112 columns and 308864 nonzeros
+Model fingerprint: 0x8cb03e58
+Variable types: 0 continuous, 22112 integer (21332 binary)
+Coefficient statistics:
+  Matrix range     [1e-02, 1e+02]
+  Objective range  [2e+02, 5e+03]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve removed 118796 rows and 4531 columns (presolve time = 5s) ...
+Presolve removed 121426 rows and 6648 columns
+Presolve time: 7.04s
+Presolved: 15683 rows, 15464 columns, 140973 nonzeros
+Variable types: 0 continuous, 15464 integer (15423 binary)
+Found heuristic solution: objective 749600.00000
+Deterministic concurrent LP optimizer: primal and dual simplex
+Showing primal log only...
+
+
+Root simplex log...
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+       0    4.1985786e+05   1.645065e+02   5.437282e+08     10s
+    4145    8.6915686e+05   0.000000e+00   8.065029e+05     11s
+Concurrent spin time: 0.00s
+
+Solved with dual simplex
+
+Root simplex log...
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+   14245    4.7196916e+05   0.000000e+00   0.000000e+00     11s
+Extra simplex iterations after uncrush: 1
+
+Root relaxation: objective 4.719692e+05, 14245 iterations, 1.19 seconds (0.42 work units)
+Total elapsed time = 11.36s (DegenMoves)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 471969.160    0 1322 749600.000 471969.160  37.0%     -   14s
+     0     0 473045.390    0 1294 749600.000 473045.390  36.9%     -   15s
+     0     0 473185.948    0 1148 749600.000 473185.948  36.9%     -   15s
+     0     0 473191.919    0 1129 749600.000 473191.919  36.9%     -   15s
+H    0     0                    614900.00000 473191.919  23.0%     -   15s
+H    0     0                    506650.00000 473191.919  6.60%     -   18s
+H    0     0                    476900.00000 473191.919  0.78%     -   18s
+     0     0 474473.270    0 1535 476900.000 474473.270  0.51%     -   21s
+     0     0 474611.943    0 1349 476900.000 474611.943  0.48%     -   22s
+     0     0 474612.512    0 1343 476900.000 474612.512  0.48%     -   22s
+H    0     0                    476650.00000 474615.945  0.43%     -   22s
+H    0     0                    476400.00000 474711.877  0.35%     -   23s
+     0     0 474711.877    0 1259 476400.000 474711.877  0.35%     -   23s
+     0     0 474751.697    0 1287 476400.000 474751.697  0.35%     -   23s
+     0     0 474758.979    0 1284 476400.000 474758.979  0.34%     -   23s
+     0     0 474759.514    0 1247 476400.000 474759.514  0.34%     -   23s
+     0     0 474760.167    0 1301 476400.000 474760.167  0.34%     -   23s
+     0     0 474760.183    0 1301 476400.000 474760.183  0.34%     -   23s
+     0     0 474760.190    0 1307 476400.000 474760.190  0.34%     -   24s
+     0     0 475076.611    0 1060 476400.000 475076.611  0.28%     -   27s
+     0     0 475076.611    0  821 476400.000 475076.611  0.28%     -   32s
+     0     0 475076.611    0  782 476400.000 475076.611  0.28%     -   32s
+     0     0 475076.611    0  782 476400.000 475076.611  0.28%     -   32s
+     0     0 475076.611    0  785 476400.000 475076.611  0.28%     -   32s
+     0     0 475076.611    0  822 476400.000 475076.611  0.28%     -   32s
+H    0     0                    476150.00000 475076.611  0.23%     -   32s
+     0     0 475335.414    0 1885 476150.000 475335.414  0.17%     -   38s
+     0     0 475351.567    0 1416 476150.000 475351.567  0.17%     -   38s
+     0     0 475351.654    0 1416 476150.000 475351.654  0.17%     -   38s
+     0     0 475393.972    0 1437 476150.000 475393.972  0.16%     -   39s
+     0     0 475396.105    0 1405 476150.000 475396.105  0.16%     -   39s
+     0     0 475396.105    0 1404 476150.000 475396.105  0.16%     -   39s
+     0     0 475418.201    0 1298 476150.000 475418.201  0.15%     -   40s
+     0     0 475418.201    0 1262 476150.000 475418.201  0.15%     -   40s
+     0     0 475430.517    0 1330 476150.000 475430.517  0.15%     -   40s
+     0     0 475430.517    0 1330 476150.000 475430.517  0.15%     -   40s
+     0     0 475437.272    0 1152 476150.000 475437.272  0.15%     -   40s
+     0     0 475443.324    0 1248 476150.000 475443.324  0.15%     -   40s
+     0     0 475443.451    0 1149 476150.000 475443.451  0.15%     -   40s
+     0     0 475648.288    0 1315 476150.000 475648.288  0.11%     -   43s
+     0     0 475648.288    0 1363 476150.000 475648.288  0.11%     -   43s
+     0     0 475648.288    0 1362 476150.000 475648.288  0.11%     -   43s
+     0     0 475692.253    0 1385 476150.000 475692.253  0.10%     -   44s
+     0     0 475692.253    0 1376 476150.000 475692.253  0.10%     -   44s
+     0     0 475692.253    0 1374 476150.000 475692.253  0.10%     -   44s
+     0     0 475703.493    0 1422 476150.000 475703.493  0.09%     -   44s
+     0     0 475703.823    0 1396 476150.000 475703.823  0.09%     -   44s
+     0     0 475708.771    0 1414 476150.000 475708.771  0.09%     -   44s
+     0     0 475708.771    0 1413 476150.000 475708.771  0.09%     -   44s
+     0     0 475712.484    0 1308 476150.000 475712.484  0.09%     -   44s
+     0     0 475712.773    0 1289 476150.000 475712.773  0.09%     -   44s
+     0     0 475712.773    0 1288 476150.000 475712.773  0.09%     -   44s
+     0     0 475712.773    0 1288 476150.000 475712.773  0.09%     -   44s
+     0     0 475872.203    0 1182 476150.000 475872.203  0.06%     -   47s
+     0     0 475872.203    0 1178 476150.000 475872.203  0.06%     -   47s
+     0     0 475885.028    0 1309 476150.000 475885.028  0.06%     -   48s
+     0     0 475885.028    0 1314 476150.000 475885.028  0.06%     -   48s
+     0     0 475898.025    0 1419 476150.000 475898.025  0.05%     -   48s
+     0     0 475898.025    0 1416 476150.000 475898.025  0.05%     -   48s
+     0     0 475900.928    0 1294 476150.000 475900.928  0.05%     -   48s
+     0     0 475900.937    0 1335 476150.000 475900.937  0.05%     -   48s
+     0     0 475937.636    0  436 476150.000 475937.636  0.04%     -   50s
+     0     0 475941.387    0 1120 476150.000 475941.387  0.04%     -   51s
+     0     0 475941.387    0 1343 476150.000 475941.387  0.04%     -   51s
+     0     0 475941.387    0 1081 476150.000 475941.387  0.04%     -   51s
+     0     0 475963.159    0 1554 476150.000 475963.159  0.04%     -   51s
+     0     0 475963.328    0 1538 476150.000 475963.328  0.04%     -   51s
+     0     0 475964.534    0 1467 476150.000 475964.534  0.04%     -   51s
+     0     0 475964.534    0 1474 476150.000 475964.534  0.04%     -   51s
+     0     0 475964.537    0 1228 476150.000 475964.537  0.04%     -   52s
+     0     0 475968.096    0 1158 476150.000 475968.096  0.04%     -   52s
+     0     0 475968.096    0  838 476150.000 475968.096  0.04%     -   55s
+     0     0 475968.096    0  803 476150.000 475968.096  0.04%     -   55s
+     0     0 475968.096    0  784 476150.000 475968.096  0.04%     -   55s
+     0     0 475968.096    0  801 476150.000 475968.096  0.04%     -   55s
+     0     0 475968.096    0  800 476150.000 475968.096  0.04%     -   55s
+     0     0 475968.096    0  864 476150.000 475968.096  0.04%     -   57s
+     0     0 475968.096    0  853 476150.000 475968.096  0.04%     -   57s
+     0     0 475968.096    0 1079 476150.000 475968.096  0.04%     -   58s
+     0     0 475968.096    0 1078 476150.000 475968.096  0.04%     -   58s
+     0     0 475968.096    0  526 476150.000 475968.096  0.04%     -   58s
+     0     0 475968.096    0  518 476150.000 475968.096  0.04%     -   58s
+     0     0 475968.096    0 1230 476150.000 475968.096  0.04%     -   58s
+     0     0 475968.096    0 1106 476150.000 475968.096  0.04%     -   59s
+     0     0 476020.624    0 1080 476150.000 476020.624  0.03%     -   59s
+     0     0 476021.415    0 1072 476150.000 476021.415  0.03%     -   59s
+     0     0 476059.126    0  921 476150.000 476059.126  0.02%     -   59s
+     0     0 476059.126    0  889 476150.000 476059.126  0.02%     -   59s
+     0     0 476059.252    0  886 476150.000 476059.252  0.02%     -   59s
+     0     0 infeasible    0      476150.000 476150.000  0.00%     -   60s
+
+Cutting planes:
+  Gomory: 7
+  Lift-and-project: 1
+  Cover: 8
+  Implied bound: 13
+  Clique: 623
+  MIR: 12
+  StrongCG: 5
+  Flow cover: 3
+  GUB cover: 15
+  Zero half: 3
+  RLT: 97
+  Relax-and-lift: 8
+  BQP: 199
+  PSD: 3
+
+Explored 1 nodes (103845 simplex iterations) in 60.21 seconds (23.13 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 10: 476150 476150 476400 ... 506650
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 4.761500000000e+05, best bound 4.761500000000e+05, gap 0.0000%
+-----------------------------------------------------------------
+  Optimal cost:  476,150.0
+  Gurobi gap:    0.0000%
+  Runtime:       60.2s
+  Points open:   91
+  Total bins:    258
+  ✅ Pickle guardado y verificado: output/exacto_500m/solucion_exacta.pkl
+  ✅ Resumen JSON:                 output/exacto_500m/solucion_exacta_resumen.json
+     Contenido del pickle:
+       z:        195 entries
+       x:        780 entries
+       w:        780 entries
+       y_assign: 2960 entries
+=================================================================
+
+
+
+python3 src/python/modelo_exacto.py data/processed/instancia_laguna_550m.json
+=================================================================
+  Exact HDM — Gurobi MIP
+=================================================================
+  Instance: Plaza del Cristo, San Cristóbal de La Laguna, España
+  Buildings: 836  Candidates: 246
+  Valid y-variables: 23750
+-----------------------------------------------------------------
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2827120
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Set parameter TimeLimit to value 10800
+Set parameter LogFile to value "output/gurobi_run.log"
+Gurobi Optimizer version 11.0.3 build v11.0.3rc0 (linux64 - "Ubuntu 20.04.6 LTS")
+
+CPU model: AMD Ryzen 7 5800H with Radeon Graphics, instruction set [SSE2|AVX|AVX2]
+Thread count: 8 physical cores, 16 logical processors, using up to 16 threads
+
+Academic license 2827120 - for non-commercial use only - registered to al___@ull.edu.es
+Optimize a model with 168320 rows, 25964 columns and 377311 nonzeros
+Model fingerprint: 0x0b0c07b6
+Variable types: 0 continuous, 25964 integer (24980 binary)
+Coefficient statistics:
+  Matrix range     [1e-02, 1e+02]
+  Objective range  [2e+02, 5e+03]
+  Bounds range     [1e+00, 1e+00]
+  RHS range        [1e+00, 1e+00]
+Presolve removed 145827 rows and 4181 columns
+Presolve time: 0.78s
+Presolved: 22493 rows, 21783 columns, 221863 nonzeros
+Variable types: 0 continuous, 21783 integer (21732 binary)
+Found heuristic solution: objective 868950.00000
+Deterministic concurrent LP optimizer: primal and dual simplex
+Showing primal log only...
+
+
+Root simplex log...
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+       0    4.9671970e+05   1.758523e+02   4.756994e+08      7s
+    5024    1.0306966e+06   0.000000e+00   9.197853e+05      7s
+Concurrent spin time: 0.00s
+
+Solved with dual simplex
+
+Root simplex log...
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+   12754    5.5799946e+05   0.000000e+00   0.000000e+00      8s
+
+Root relaxation: objective 5.579995e+05, 12754 iterations, 1.40 seconds (0.45 work units)
+Total elapsed time = 7.55s (DegenMoves)
+Total elapsed time = 10.22s (DegenMoves)
+
+    Nodes    |    Current Node    |     Objective Bounds      |     Work
+ Expl Unexpl |  Obj  Depth IntInf | Incumbent    BestBd   Gap | It/Node Time
+
+     0     0 557999.464    0 1873 868950.000 557999.464  35.8%     -   17s
+     0     0 558060.725    0 1851 868950.000 558060.725  35.8%     -   18s
+     0     0 558125.324    0 1589 868950.000 558125.324  35.8%     -   18s
+H    0     0                    582400.00000 558125.324  4.17%     -   18s
+H    0     0                    573700.00000 558125.324  2.71%     -   18s
+H    0     0                    564850.00000 558125.324  1.19%     -   26s
+H    0     0                    561400.00000 558125.324  0.58%     -   26s
+H    0     0                    561150.00000 558125.324  0.54%     -   26s
+     0     0 558603.954    0 2446 561150.000 558603.954  0.45%     -   27s
+     0     0 558603.954    0  344 561150.000 558603.954  0.45%     -   30s
+     0     0 558603.954    0  338 561150.000 558603.954  0.45%     -   30s
+     0     0 558603.954    0  336 561150.000 558603.954  0.45%     -   30s
+H    0     0                    560400.00000 558603.954  0.32%     -   30s
+     0     0 558803.983    0  716 560400.000 558803.983  0.28%     -   32s
+     0     0 558809.285    0  721 560400.000 558809.285  0.28%     -   32s
+     0     0 558809.467    0  722 560400.000 558809.467  0.28%     -   32s
+     0     0 558874.369    0 2002 560400.000 558874.369  0.27%     -   35s
+     0     0 558875.020    0 2024 560400.000 558875.020  0.27%     -   36s
+     0     0 558875.095    0 2052 560400.000 558875.095  0.27%     -   36s
+H    0     0                    560350.00000 558878.431  0.26%     -   36s
+     0     0 559019.919    0  837 560350.000 559019.919  0.24%     -   36s
+     0     0 559019.919    0  835 560350.000 559019.919  0.24%     -   36s
+H    0     0                    560150.00000 559226.228  0.16%     -   37s
+     0     0 559226.228    0 1919 560150.000 559226.228  0.16%     -   38s
+     0     0 559226.228    0 1914 560150.000 559226.228  0.16%     -   38s
+     0     0 559286.192    0 1883 560150.000 559286.192  0.15%     -   38s
+     0     0 559286.192    0 1881 560150.000 559286.192  0.15%     -   38s
+     0     0 559314.173    0 1876 560150.000 559314.173  0.15%     -   39s
+     0     0 559316.803    0 1895 560150.000 559316.803  0.15%     -   39s
+     0     0 559317.368    0 1893 560150.000 559317.368  0.15%     -   39s
+     0     0 559317.702    0 1910 560150.000 559317.702  0.15%     -   39s
+     0     0 559317.747    0 1912 560150.000 559317.747  0.15%     -   39s
+     0     0 559657.586    0 1440 560150.000 559657.586  0.09%     -   42s
+     0     0 559658.744    0 1474 560150.000 559658.744  0.09%     -   42s
+     0     0 559744.749    0  948 560150.000 559744.749  0.07%     -   42s
+     0     0 559744.749    0  947 560150.000 559744.749  0.07%     -   43s
+     0     0 559772.793    0 1216 560150.000 559772.793  0.07%     -   43s
+     0     0 559772.793    0 1260 560150.000 559772.793  0.07%     -   43s
+     0     0 559776.248    0 1262 560150.000 559776.248  0.07%     -   43s
+     0     0 559777.684    0 1381 560150.000 559777.684  0.07%     -   43s
+     0     0 559778.392    0 1250 560150.000 559778.392  0.07%     -   43s
+     0     0 559778.463    0 1389 560150.000 559778.463  0.07%     -   43s
+     0     0 559898.063    0  825 560150.000 559898.063  0.04%     -   44s
+     0     0 559908.587    0 1904 560150.000 559908.587  0.04%     -   45s
+     0     0 559908.587    0 1907 560150.000 559908.587  0.04%     -   45s
+     0     0 559908.885    0 1985 560150.000 559908.885  0.04%     -   45s
+     0     0 559909.128    0 1992 560150.000 559909.128  0.04%     -   45s
+     0     0 559921.655    0  734 560150.000 559921.655  0.04%     -   45s
+     0     0 559921.655    0  824 560150.000 559921.655  0.04%     -   48s
+     0     0 559921.655    0  643 560150.000 559921.655  0.04%     -   48s
+     0     0 559921.655    0  658 560150.000 559921.655  0.04%     -   48s
+     0     0 559921.655    0  820 560150.000 559921.655  0.04%     -   49s
+     0     0 559921.655    0  793 560150.000 559921.655  0.04%     -   49s
+     0     0 559921.655    0  620 560150.000 559921.655  0.04%     -   49s
+     0     0 559921.655    0  616 560150.000 559921.655  0.04%     -   49s
+     0     0 559921.655    0  848 560150.000 559921.655  0.04%     -   49s
+     0     0 559921.655    0  850 560150.000 559921.655  0.04%     -   49s
+     0     0 559921.655    0  376 560150.000 559921.655  0.04%     -   49s
+     0     0 559921.655    0  696 560150.000 559921.655  0.04%     -   49s
+     0     0 559923.690    0  417 560150.000 559923.690  0.04%     -   49s
+     0     0 559923.691    0  424 560150.000 559923.691  0.04%     -   49s
+     0     0 559923.691    0  424 560150.000 559923.691  0.04%     -   50s
+     0     0 559931.638    0  726 560150.000 559931.638  0.04%     -   50s
+     0     0 559932.443    0  420 560150.000 559932.443  0.04%     -   50s
+     0     0 559932.466    0  421 560150.000 559932.466  0.04%     -   50s
+     0     0 559956.094    0  741 560150.000 559956.094  0.03%     -   50s
+     0     0 559956.094    0  275 560150.000 559956.094  0.03%     -   51s
+     0     0 559956.094    0  331 560150.000 559956.094  0.03%     -   51s
+     0     0 559956.094    0  370 560150.000 559956.094  0.03%     -   51s
+     0     0 559956.094    0  354 560150.000 559956.094  0.03%     -   51s
+     0     0 559959.702    0  363 560150.000 559959.702  0.03%     -   51s
+     0     0 559959.738    0  361 560150.000 559959.738  0.03%     -   51s
+     0     0 559962.154    0  351 560150.000 559962.154  0.03%     -   51s
+     0     0 559964.717    0  343 560150.000 559964.717  0.03%     -   51s
+     0     0 560001.074    0  438 560150.000 560001.074  0.03%     -   51s
+     0     0 560006.904    0  316 560150.000 560006.904  0.03%     -   51s
+     0     0 560009.300    0  405 560150.000 560009.300  0.03%     -   51s
+     0     0 560009.300    0  395 560150.000 560009.300  0.03%     -   51s
+     0     0 560025.000    0  277 560150.000 560025.000  0.02%     -   51s
+     0     0 560025.000    0  282 560150.000 560025.000  0.02%     -   51s
+     0     0 560025.000    0  282 560150.000 560025.000  0.02%     -   51s
+     0     0 560025.000    0  183 560150.000 560025.000  0.02%     -   51s
+     0     2 560032.828    0  183 560150.000 560032.828  0.02%     -   51s
+
+Cutting planes:
+  Learned: 1
+  Gomory: 3
+  Cover: 13
+  Implied bound: 20
+  Clique: 70
+  MIR: 20
+  StrongCG: 2
+  Flow cover: 1
+  GUB cover: 17
+  Zero half: 14
+  RLT: 31
+  Relax-and-lift: 11
+  BQP: 21
+
+Explored 3 nodes (102335 simplex iterations) in 51.78 seconds (21.27 work units)
+Thread count was 16 (of 16 available processors)
+
+Solution count 10: 560150 560150 560150 ... 561150
+
+Optimal solution found (tolerance 1.00e-04)
+Best objective 5.601500000000e+05, best bound 5.601000000000e+05, gap 0.0089%
+-----------------------------------------------------------------
+  Optimal cost:  560,150.0
+  Gurobi gap:    0.0089%
+  Runtime:       51.8s
+  Points open:   107
+  Total bins:    304
+  ✅ Pickle guardado y verificado: output/exacto_550m/solucion_exacta.pkl
+  ✅ Resumen JSON:                 output/exacto_550m/solucion_exacta_resumen.json
+     Contenido del pickle:
+       z:        246 entries
+       x:        984 entries
+       w:        984 entries
+       y_assign: 3344 entries
+=================================================================
