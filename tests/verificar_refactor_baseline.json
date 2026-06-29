@@ -1,0 +1,10 @@
+{
+  "instance_path": "data/processed/instancia_laguna_250m.json",
+  "max_iter": 8,
+  "result": {
+    "best_lb": 87410.0,
+    "best_ub": 101270.0,
+    "gap": 0.136861854448504,
+    "n_iterations": 8
+  }
+}

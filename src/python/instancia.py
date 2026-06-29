@@ -50,12 +50,13 @@ class ModelParameters:
     overflow_penalty: float
 
     # --- Indexed by waste type k={0,1,2,3} ---
-    # k=0: organic  k=1: general  k=2: recyclable  k=3: hazardous
+    # k=0: orgánico  k=1: resto  k=2: papel/cartón  k=3: vidrio
     bin_cost: dict[int, float]
     bin_capacity: dict[int, float]
     coverage_radius: dict[int, float]
     waste_proportion: dict[int, float]
     collection_frequency: dict[int, float]  # Reserved for HVM
+    waste_density: dict[int, float]          # kg/L por tipo de residuo
 
     # --- Demand variability parameters (HVM) ---
     lognormal_mu: float
@@ -119,8 +120,11 @@ def compute_demand(
     params: ModelParameters,
     k: int,
 ) -> float:
-    """Deterministic daily demand for waste type k at building i (HDM)."""
-    return h_i * params.waste_per_capita * params.waste_proportion[k]
+    """Demanda diaria de tipo k en el edificio i, en LITROS/día (HDM).
+    Convierte la generación másica (kg) a volumen (L) dividiendo por la
+    densidad del residuo, porque los contenedores se llenan por volumen."""
+    kg = h_i * params.waste_per_capita * params.waste_proportion[k]
+    return kg / params.waste_density[k]
 
 
 
@@ -142,6 +146,7 @@ def load_instance(path: str) -> Instance:
         coverage_radius={int(k): v for k, v in p["coverage_radius"].items()},
         waste_proportion={int(k): v for k, v in p["waste_proportion"].items()},
         collection_frequency={int(k): v for k, v in p["collection_frequency"].items()},
+        waste_density={int(k): v for k, v in p["waste_density"].items()},
         lognormal_mu=p["lognormal_mu"],
         lognormal_sigma=p["lognormal_sigma"],
         overflow_threshold=p["overflow_threshold"],

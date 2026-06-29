@@ -112,6 +112,7 @@ def save_instance(instance: Instance, path: str) -> None:
             "coverage_radius": {str(k): v for k, v in instance.params.coverage_radius.items()},
             "waste_proportion": {str(k): v for k, v in instance.params.waste_proportion.items()},
             "collection_frequency": {str(k): v for k, v in instance.params.collection_frequency.items()},
+            "waste_density": {str(k): v for k, v in instance.params.waste_density.items()},
             "lognormal_mu": instance.params.lognormal_mu,
             "lognormal_sigma": instance.params.lognormal_sigma,
             "overflow_threshold": instance.params.overflow_threshold,
