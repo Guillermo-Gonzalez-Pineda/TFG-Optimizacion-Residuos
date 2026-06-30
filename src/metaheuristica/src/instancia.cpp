@@ -8,6 +8,7 @@
 
 #include "nlohmann/json.hpp"
 
+#include <cmath>
 #include <fstream>
 #include <stdexcept>
 #include <string>
@@ -51,6 +52,10 @@ Instance load_instance(const std::string& path) {
     inst.n_buildings   = meta.at("n_buildings").get<int>();
     inst.n_candidates  = meta.at("n_candidates").get<int>();
     inst.n_waste_types = meta.at("n_waste_types").get<int>();
+    // Radio OSM en metros. Lo leemos como double y redondeamos para tolerar
+    // tanto un entero (400) como un float (1500.0) en el JSON; la etiqueta de
+    // tamaño se construirá con este int, sin decimales.
+    inst.osm_radius = static_cast<int>(std::lround(meta.at("osm_radius_m").get<double>()));
 
     // --- Parámetros del modelo: data["parameters"] ---
     // El struct ModelParameters solo contiene un subconjunto de los parámetros

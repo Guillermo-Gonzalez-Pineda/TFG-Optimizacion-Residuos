@@ -52,6 +52,7 @@ struct Instance {
     int n_buildings;   // nº de edificios (|I|)
     int n_candidates;  // nº de candidatos (|J|)
     int n_waste_types;  // nº de tipos de residuo (|K| = 4)
+    int osm_radius;     // radio OSM en metros (meta["osm_radius_m"]): etiqueta de tamaño
 
     std::vector<Building>  buildings;   // I: indexado 0..n_buildings-1
     std::vector<Candidate> candidates;  // J: indexado 0..n_candidates-1
