@@ -1,6 +1,20 @@
 #include "tabu/solution.hpp"
 
 
+int bins_for_demand(double demand, double capacity) {
+  return static_cast<int>(std::ceil(demand / capacity));
+}
+
+int find_nearest_open(const SolutionState& solution, const Instance& instance,
+                      int i, int k, int exclude) {
+  for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
+    if (vc.j != exclude && solution.open[vc.j]) {
+      return vc.j;   // el primero abierto es el más cercano (lista ordenada)
+    }
+  }
+  return -1;
+}
+
 void init_empty(SolutionState& solution, const Instance& instance) {
   const int n_buildings  = instance.n_buildings;
   const int n_candidates = instance.n_candidates;
@@ -19,6 +33,7 @@ void init_empty(SolutionState& solution, const Instance& instance) {
   solution.n_violations_coverage = 0;
 }
 
+
 /**
  * Recalcula el número de contenedores necesarios para un punto y tipo de residuo
  * dado, usando la demanda acumulada y la capacidad del contenedor.
@@ -31,10 +46,8 @@ void init_empty(SolutionState& solution, const Instance& instance) {
  */
 static void recompute_bins(SolutionState& solution, const Instance& instance,
                            int point, int k) {
-  const double demand   = solution.demand_at[point][k];
-  const double capacity = instance.params.bin_capacity[k];
-
-  solution.bins[point][k] = static_cast<int>(std::ceil(demand / capacity));
+  solution.bins[point][k] = bins_for_demand(solution.demand_at[point][k], 
+                                            instance.params.bin_capacity[k]);
 }
 
 
@@ -86,8 +99,6 @@ void apply_close(SolutionState& solution, const Instance& instance, int candidat
   // 1) Marcar el punto como cerrado.
   solution.open[candidate] = false;
 
-  // Conjunto de puntos cuya demanda cambia (los destinos de los huérfanos), para
-  // recalcular sus bins al final, una sola vez cada uno.
   std::set<int> touched;
 
   // 2) Tomar los huérfanos: los pares (i,k) que REALMENTE estaban en 'candidate'.
@@ -103,31 +114,19 @@ void apply_close(SolutionState& solution, const Instance& instance, int candidat
 
   // 4) Reasignar cada huérfano a su siguiente punto abierto más cercano.
   for (const auto& [i, k] : orphans) {
-    // Buscar en su lista de candidatos válidos (ordenada por cercanía) el primer
-    // punto ABIERTO distinto del que acabamos de cerrar.
-    int new_point = -1;
-    double new_dist = std::numeric_limits<double>::infinity();
-
-    for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
-      if (vc.j != candidate && solution.open[vc.j]) {
-        new_point = vc.j;
-        new_dist  = vc.distance;
-        break;   // el primero abierto es el más cercano (lista pre-ordenada)
-      }
-    }
+    // Buscar destino con la helper compartida (excluyendo el punto cerrado).
+    int new_point = find_nearest_open(solution, instance, i, k, candidate);
 
     if (new_point != -1) {
-      // 4a) Encontró destino: reasignar al nuevo punto.
+      // Necesitamos la distancia al nuevo punto: la tomamos de dist.
       solution.assignment[i][k]    = new_point;
-      solution.assigned_dist[i][k] = new_dist;
+      solution.assigned_dist[i][k] = instance.dist[new_point].at(i);
       solution.demand_at[new_point][k] += instance.demand[i][k];
       solution.buildings_at[new_point].push_back(std::make_pair(i, k));
       touched.insert(new_point);
     } else {
-      // 4b) No hay ningún otro punto abierto: queda descubierto.
       solution.assignment[i][k]    = -1;
       solution.assigned_dist[i][k] = std::numeric_limits<double>::infinity();
-      // (violación de cobertura: la contará compute_cost)
     }
   }
 
@@ -191,4 +190,11 @@ void compute_cost(SolutionState& solution, const Instance& instance, double rho)
   solution.total_cost   = cost;
   solution.n_violations_capacity = n_cap;
   solution.n_violations_coverage = n_cov;
+}
+
+
+void apply_swap(SolutionState& solution, const Instance& instance,
+                int j_out, int j_in) {
+  apply_close(solution, instance, j_out);
+  apply_open(solution, instance, j_in);
 }

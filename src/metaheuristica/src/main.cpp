@@ -6,6 +6,8 @@
 #include "tabu/solution.hpp"
 #include "tabu/constructive.hpp"
 #include "tabu/io.hpp"
+#include "tabu/movimientos.hpp"
+#include "tabu/tabu.hpp"
 
 int main(int argc, char** argv) {
   // Ruta a la instancia de 500m (se puede sobrescribir por argumento).
@@ -20,40 +22,21 @@ int main(int argc, char** argv) {
   preprocess(instance);
 
   // Test apply_close: abrir y cerrar debe dejar el coste como al principio.
-  SolutionState test;
-  init_empty(test, instance);
-  compute_cost(test, instance, 100000.0);
-  double cost_empty = test.total_cost;
+  SolutionState solution;
 
-  apply_open(test, instance, 42);
-  compute_cost(test, instance, 100000.0);
-  double cost_open = test.total_cost;
+  construct_initial(solution, instance, 100000.0);
+  double cost_greedy = solution.total_cost;
 
-  apply_close(test, instance, 42);
-  compute_cost(test, instance, 100000.0);
-  double cost_closed = test.total_cost;
+  TabuParams params;   // valores por defecto
+  SolutionState result = tabu_search(solution, instance, params);
 
-  std::cout << "\n=== Test apply_close (abrir/cerrar punto 42) ===\n";
-  std::cout << "  Coste vacio:           " << cost_empty << "\n";
-  std::cout << "  Coste tras abrir 42:   " << cost_open << "\n";
-  std::cout << "  Coste tras cerrar 42:  " << cost_closed << "\n";
-  std::cout << "  ¿Vuelve al vacio? " << (cost_closed == cost_empty ? "SI" : "NO") << "\n";
-
-
-  // Test 4a: reasignación con éxito. Necesitamos dos puntos que sirvan al edificio 0.
-  SolutionState test2;
-  init_empty(test2, instance);
-  int primero = instance.valid_candidates[0][0][0].j;   // el más cercano
-  int segundo = instance.valid_candidates[0][0][1].j;   // el 2º más cercano
-  std::cout << primero << " " << segundo << "\n";
-  apply_open(test2, instance, primero);
-  apply_open(test2, instance, segundo);
-  std::cout << "\n=== Test 4a (reasignacion) ===\n";
-  std::cout << "  Edificio 0 asignado a: " << test2.assignment[0][0]
-            << " (el mas cercano de los dos abiertos)\n";
-  apply_close(test2, instance, test2.assignment[0][0]);   // cerrar su punto actual
-  std::cout << "  Tras cerrar su punto, reasignado a: " << test2.assignment[0][0]
-            << " (esperado: el otro punto, NO -1)\n";
+  std::cout << "\n=== Tabu search ===\n";
+  std::cout << "  Coste greedy:  " << cost_greedy << "\n";
+  std::cout << "  Coste tabu:    " << result.total_cost << "\n";
+  std::cout << "  Mejora:        " << (cost_greedy - result.total_cost)
+            << " (" << 100.0*(cost_greedy - result.total_cost)/cost_greedy << "%)\n";
+  std::cout << "  Factible: " << (result.n_violations_capacity==0 &&
+                                  result.n_violations_coverage==0 ? "SI" : "NO") << "\n";
 
   return 0;
 }

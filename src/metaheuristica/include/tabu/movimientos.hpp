@@ -1,0 +1,48 @@
+#pragma once
+
+#include "tabu/solution.hpp"
+#include "tabu/instancia.hpp"
+
+/**
+ * Calcula el CAMBIO de coste que produciría cerrar el punto `candidate`, SIN
+ * modificar la solución. Devuelve delta = coste(tras cerrar) - coste(actual).
+ * Un delta negativo significa que cerrar mejora (abarata).
+ *
+ * Simula el efecto de forma ligera: lee el estado, acumula en variables locales
+ * el cambio en apertura, contenedores y violaciones de los puntos afectados, y
+ * devuelve el número. No copia ni muta el estado.
+ *
+ * @param solution Solución actual (solo se lee).
+ * @param instance Instancia (geometría, derivadas, costes).
+ * @param candidate Punto cuyo cierre se evalúa.
+ * @param rho Peso de la penalización por violación.
+ * @return Cambio de coste (negativo = mejora).
+ */
+double delta_close(const SolutionState& solution, const Instance& instance,
+                   int candidate, double rho);
+
+
+/**
+ * Calcula el CAMBIO de coste que produciría abrir el punto `candidate`, SIN
+ * modificar la solución. Devuelve delta = coste(tras abrir) - coste(actual).
+ * Un delta negativo significa que abrir mejora.
+ *
+ * Simula de forma ligera: los edificios para los que 'candidate' es más cercano
+ * que su asignación actual migrarían a él; se acumula la demanda que gana
+ * 'candidate' y la que pierden los puntos antiguos, y se calcula el cambio de
+ * contenedores y violaciones. No copia ni muta el estado.
+ */
+double delta_open(const SolutionState& solution, const Instance& instance,
+                  int candidate, double rho);
+
+
+
+/**
+ * Calcula el cambio de coste de intercambiar (cerrar j_out, abrir j_in) sin
+ * tocar la solución original. Por ahora se evalúa sobre una copia temporal,
+ * que garantiza correctitud frente a la interacción cierre/apertura (los
+ * huérfanos de j_out pueden reubicarse en j_in y viceversa). Optimizable más
+ * adelante a evaluación puramente local si hiciera falta velocidad.
+ */
+double delta_swap(const SolutionState& solution, const Instance& instance,
+                  int j_out, int j_in, double rho);

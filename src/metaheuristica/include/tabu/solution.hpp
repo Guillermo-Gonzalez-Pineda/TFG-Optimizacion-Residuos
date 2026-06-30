@@ -27,6 +27,19 @@ struct SolutionState {
 };
 
 /**
+ * Calcula el número de contenedores necesarios para una demanda dada.
+ * Función pura: techo(demanda / capacidad). No toca estado.
+ */
+int bins_for_demand(double demand, double capacity);
+
+/**
+ * Encuentra el punto abierto más cercano que puede servir al par (edificio i,
+ * tipo k), excluyendo el punto `exclude`. 
+ */
+int find_nearest_open(const SolutionState& solution, const Instance& instance,
+                      int i, int k, int exclude);
+
+/**
  * Inicializa una solución vacía (ningún punto abierto) para la instancia dada.
  * Deja todos los vectores dimensionados y en su valor "vacío": nada abierto,
  * nadie asignado, sin demanda ni contenedores.
@@ -61,6 +74,15 @@ void apply_open(SolutionState& solution, const Instance& instance, int candidate
  * @param candidate Índice del punto a cerrar.
  */
 void apply_close(SolutionState& solution, const Instance& instance, int candidate);
+
+
+/**
+ * Intercambia: cierra j_out y abre j_in. Se apoya en las primitivas existentes
+ * aplicadas en secuencia (cerrar y luego abrir), de modo que apply_open ve el
+ * estado ya actualizado por apply_close y la interacción se resuelve sola.
+ */
+void apply_swap(SolutionState& solution, const Instance& instance,
+                int j_out, int j_in);
 
 
 /**
