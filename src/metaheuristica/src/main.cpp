@@ -41,10 +41,8 @@ int main(int argc, char** argv) {
 
 
   // Test 4a: reasignación con éxito. Necesitamos dos puntos que sirvan al edificio 0.
-  // Sabemos que el 42 sirve al edificio 0 (tipo 0). Busquemos otro de su lista.
   SolutionState test2;
   init_empty(test2, instance);
-  // Abrir el 42 y el segundo candidato válido del edificio 0, tipo 0:
   int primero = instance.valid_candidates[0][0][0].j;   // el más cercano
   int segundo = instance.valid_candidates[0][0][1].j;   // el 2º más cercano
   std::cout << primero << " " << segundo << "\n";
