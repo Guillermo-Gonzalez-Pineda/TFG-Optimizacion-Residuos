@@ -37,12 +37,17 @@ struct ValidCandidate {
     }
 };
 
+
 struct BuildingType {
     int    i;           // edificio
     int    k;           // tipo de residuo
     double distance;    // dist de j a i (metros)
 };
 
+/**
+ * Representa una instancia del problema de optimización de residuos.
+ * Contiene todos los datos necesarios para evaluar soluciones.
+ */
 struct Instance {
     int n_buildings;   // nº de edificios (|I|)
     int n_candidates;  // nº de candidatos (|J|)
@@ -56,8 +61,6 @@ struct Instance {
     // Distancias dispersas: dist[j] = mapa de {edificio_i -> distancia}
     std::vector<std::unordered_map<int, double>> dist;
 
-    // (Las estructuras derivadas — candidatos válidos, demanda, inversa —
-    //  las añadiremos después; primero la instancia cruda.)
     std::vector<std::vector<std::vector<ValidCandidate>>> valid_candidates;
     //     [i]         [k]         [lista ordenada]
     std::vector<std::vector<BuildingType>> buildings_of;
@@ -66,11 +69,15 @@ struct Instance {
     //     [i]         [k]
 };
 
-// Carga una instancia CRUDA desde un fichero JSON (mismo formato que produce
-// el generador en Python, src/python/instancia.py). Réplica de load_instance:
-// lee exactamente los mismos campos en la misma estructura.
-// Lanza std::runtime_error si el fichero no se puede abrir.
+/**
+ * Carga una instancia CRUDA desde un fichero JSON.
+ * @param path Ruta al fichero JSON.
+ * @return Instancia cargada.
+ */
 Instance load_instance(const std::string& path);
 
-// La función que rellena las estructuras derivadas a partir de la instancia cruda.
+/**
+ * Preprocesa la instancia para calcular distancias, candidatos válidos y demanda.
+ * @param inst Instancia a preprocesar.
+ */
 void preprocess(Instance& inst);
