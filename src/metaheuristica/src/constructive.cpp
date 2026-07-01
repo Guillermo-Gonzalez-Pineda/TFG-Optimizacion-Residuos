@@ -31,7 +31,7 @@ static int total_bins_at(const SolutionState& solution, const Instance& instance
 static int find_saturated_point(const SolutionState& solution, const Instance& instance) {
   const int max_bins = instance.params.max_bins;
   for (int j = 0; j < instance.n_candidates; ++j) {
-    if (!solution.open[j]) continue;
+    if (!solution.is_open(j)) continue;
     if (total_bins_at(solution, instance, j) > max_bins) {
       return j;
     }
@@ -48,12 +48,14 @@ static int find_saturated_point(const SolutionState& solution, const Instance& i
 static int find_reliever(const SolutionState& solution, const Instance& instance,
                          int saturated_point) {
   // Recorrer los edificios asignados al punto saturado.
-  for (const auto& [i, k] : solution.buildings_at[saturated_point]) {
-    // Mirar sus candidatos válidos (ordenados por cercanía).
-    for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
-      // Un candidato cerrado y distinto del saturado puede atraer a este edificio.
-      if (!solution.open[vc.j] && vc.j != saturated_point) {
-        return vc.j;
+  for (int k = 0; k < instance.n_waste_types; ++k) {
+    for (int i : solution.buildings_at[saturated_point][k]) {
+      // Mirar sus candidatos válidos (ordenados por cercanía).
+      for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
+        // Un candidato cerrado y distinto del saturado puede atraer a este edificio.
+        if (!solution.is_open(vc.j) && vc.j != saturated_point) {
+          return vc.j;
+        }
       }
     }
   }
@@ -73,7 +75,7 @@ void construct_initial(SolutionState& solution, const Instance& instance, double
 
     // Buscar el candidato cerrado que cubre más pares (i,k) descubiertos.
     for (int j = 0; j < n_candidates; ++j) {
-      if (solution.open[j]) continue;            // ya abierto, saltar
+      if (solution.is_open(j)) continue;         // ya abierto, saltar
       const int coverage = count_newly_covered(solution, instance, j);
       if (coverage > best_coverage) {
         best_coverage = coverage;

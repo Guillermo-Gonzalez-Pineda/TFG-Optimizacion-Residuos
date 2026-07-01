@@ -36,7 +36,7 @@ void save_solution(const SolutionState& solution, const Instance& instance,
   json open_points = json::array();
   int  n_points_open = 0;
   for (int j = 0; j < n_candidates; ++j) {
-    if (solution.open[j]) {
+    if (solution.is_open(j)) {
       open_points.push_back(j);
       ++n_points_open;
     }
@@ -89,7 +89,7 @@ void save_solution(const SolutionState& solution, const Instance& instance,
   json bins_detail   = json::object();
   json demand_detail = json::object();
   for (int j = 0; j < n_candidates; ++j) {
-    if (!solution.open[j]) {
+    if (!solution.is_open(j)) {
       continue;
     }
     const std::string key = std::to_string(j);

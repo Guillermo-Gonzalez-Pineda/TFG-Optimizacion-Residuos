@@ -33,18 +33,20 @@ double delta_close(const SolutionState& solution, const Instance& instance,
   int new_coverage_violations = 0;   // huérfanos que no encuentran destino
 
   // Bloque 2: buscar destino con la helper compartida.
-  for (const auto& [i, k] : solution.buildings_at[candidate]) {
-    int destination = find_nearest_open(solution, instance, i, k, candidate);
+  for (int k = 0; k < n_types; ++k) {
+    for (int i : solution.buildings_at[candidate][k]) {
+      int destination = find_nearest_active(solution, instance, i, k, candidate);
 
-    if (destination == -1) {
-      ++new_coverage_violations;
-      
-    } else {
-      auto it = extra_demand.find(destination);
-      if (it == extra_demand.end()) {
-        it = extra_demand.emplace(destination, std::vector<double>(n_types, 0.0)).first;
+      if (destination == -1) {
+        ++new_coverage_violations;
+
+      } else {
+        auto it = extra_demand.find(destination);
+        if (it == extra_demand.end()) {
+          it = extra_demand.emplace(destination, std::vector<double>(n_types, 0.0)).first;
+        }
+        it->second[k] += instance.demand[i][k];
       }
-      it->second[k] += instance.demand[i][k];
     }
   }
 
@@ -169,21 +171,23 @@ double delta_swap(const SolutionState& solution, const Instance& instance,
   // --- 1) Cerrar j_out: ahorrar su apertura y reubicar sus edificios ---
   delta -= instance.candidates[j_out].opening_cost;
 
-  for (const auto& [i, k] : solution.buildings_at[j_out]) {
-    // Buscar destino: el más cercano que esté abierto (tratando j_in como abierto,
-    // porque el swap lo abre) y que no sea j_out (que se cierra).
-    int dest = -1;
-    for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
-      if (vc.j == j_out) continue;
-      if (vc.j == j_in || solution.open[vc.j]) {
-        dest = vc.j;
-        break;
+  for (int k = 0; k < n_types; ++k) {
+    for (int i : solution.buildings_at[j_out][k]) {
+      // Buscar destino: el más cercano que tenga ACTIVO el tipo k (tratando j_in
+      // como activo, porque el swap lo abre) y que no sea j_out (que se cierra).
+      int dest = -1;
+      for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
+        if (vc.j == j_out) continue;
+        if (vc.j == j_in || solution.active[vc.j][k]) {
+          dest = vc.j;
+          break;
+        }
       }
-    }
-    if (dest == -1) {
-      new_coverage++;   // ningún destino: queda descubierto
-    } else {
-      demand_change_of(net_demand, dest, n_types)[k] += instance.demand[i][k];
+      if (dest == -1) {
+        new_coverage++;   // ningún destino: queda descubierto
+      } else {
+        demand_change_of(net_demand, dest, n_types)[k] += instance.demand[i][k];
+      }
     }
   }
 

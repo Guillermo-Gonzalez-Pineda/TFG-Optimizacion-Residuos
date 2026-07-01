@@ -72,21 +72,21 @@ static SolutionState oracle_rebuild(const SolutionState& cur,
                                     const Instance& instance, double rho) {
   SolutionState s;
   init_empty(s, instance);
-  s.open = cur.open;   // mismo conjunto abierto; todo lo demás se recalcula
+  s.active = cur.active;   // mismas activaciones; todo lo demás se recalcula
 
   for (int i = 0; i < instance.n_buildings; ++i) {
     for (int k = 0; k < instance.n_waste_types; ++k) {
       int    chosen = -1;
       double cd     = std::numeric_limits<double>::infinity();
-      // nearest-open: primer valid_candidate ABIERTO (lista ya ordenada).
+      // nearest-active: primer valid_candidate con el tipo k ACTIVO (lista ya ordenada).
       for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
-        if (s.open[vc.j]) { chosen = vc.j; cd = vc.distance; break; }
+        if (s.active[vc.j][k]) { chosen = vc.j; cd = vc.distance; break; }
       }
       s.assignment[i][k]    = chosen;
       s.assigned_dist[i][k] = cd;
       if (chosen != -1) {
         s.demand_at[chosen][k] += instance.demand[i][k];
-        s.buildings_at[chosen].push_back(std::make_pair(i, k));
+        s.buildings_at[chosen][k].push_back(i);
       }
     }
   }
@@ -219,7 +219,7 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
 
     // --- Vecinos de abrir / cerrar ---
     for (int j = 0; j < n_candidates; ++j) {
-      if (solution.open[j]) {
+      if (solution.is_open(j)) {
         // CERRAR j
         double d = delta_close(solution, instance, j, current_rho);
         bool tabu_move = tabu.is_close_forbidden(j, iter);
@@ -241,15 +241,17 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
     // --- Vecinos de swap ACOTADOS: por cada abierto, solo intercambiar por
     //     candidatos cerrados CERCANOS (los valid_candidates de sus edificios). ---
     for (int j_out = 0; j_out < n_candidates; ++j_out) {
-      if (!solution.open[j_out]) continue;
+      if (!solution.is_open(j_out)) continue;
 
       // Recoger candidatos cerrados cercanos: los valid_candidates de los
       // edificios que j_out sirve. Usamos un set para no repetir.
       std::set<int> nearby_closed;
-      for (const auto& [i, k] : solution.buildings_at[j_out]) {
-        for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
-          if (!solution.open[vc.j] && vc.j != j_out) {
-            nearby_closed.insert(vc.j);
+      for (int k = 0; k < instance.n_waste_types; ++k) {
+        for (int i : solution.buildings_at[j_out][k]) {
+          for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
+            if (!solution.is_open(vc.j) && vc.j != j_out) {
+              nearby_closed.insert(vc.j);
+            }
           }
         }
       }

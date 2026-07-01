@@ -6,11 +6,11 @@ int bins_for_demand(double demand, double capacity) {
   return static_cast<int>(std::ceil(demand / capacity));
 }
 
-int find_nearest_open(const SolutionState& solution, const Instance& instance,
-                      int i, int k, int exclude) {
+int find_nearest_active(const SolutionState& solution, const Instance& instance,
+                        int i, int k, int exclude) {
   for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
-    if (vc.j != exclude && solution.open[vc.j]) {
-      return vc.j;   // el primero abierto es el más cercano (lista ordenada)
+    if (vc.j != exclude && solution.active[vc.j][k]) {
+      return vc.j;   // el primero con el tipo k activo es el más cercano (lista ordenada)
     }
   }
   return -1;
@@ -21,13 +21,14 @@ void init_empty(SolutionState& solution, const Instance& instance) {
   const int n_candidates = instance.n_candidates;
   const int n_types      = instance.n_waste_types;
 
-  solution.open.assign(n_candidates, false);
+  solution.active.assign(n_candidates, std::vector<bool>(n_types, false));
   solution.assignment.assign(n_buildings, std::vector<int>(n_types, -1));
   solution.assigned_dist.assign(n_buildings,
       std::vector<double>(n_types, std::numeric_limits<double>::infinity()));
   solution.demand_at.assign(n_candidates, std::vector<double>(n_types, 0.0));
   solution.bins.assign(n_candidates, std::vector<int>(n_types, 0));
-  solution.buildings_at.assign(n_candidates, std::vector<std::pair<int,int>>{});
+  solution.buildings_at.assign(n_candidates,
+      std::vector<std::vector<int>>(n_types));
 
   solution.total_cost   = 0.0;
   solution.n_violations_capacity = 0;
@@ -53,10 +54,14 @@ static void recompute_bins(SolutionState& solution, const Instance& instance,
 
 
 void apply_open(SolutionState& solution, const Instance& instance, int candidate) {
-  if (solution.open[candidate]) return;
+  if (solution.is_open(candidate)) return;
 
-  solution.open[candidate] = true;
-  
+  // Andamiaje Paso 1: abrir el punto ENTERO = activar todos los tipos a la vez
+  // (reproduce el open[j] viejo; los deltas/primitivas per-tipo llegan luego).
+  for (int k = 0; k < instance.n_waste_types; ++k) {
+    solution.active[candidate][k] = true;
+  }
+
   std::set<int> touched; // Conjunto de puntos cuya demanda cambia.
   touched.insert(candidate);
 
@@ -71,16 +76,16 @@ void apply_open(SolutionState& solution, const Instance& instance, int candidate
 
       if (old_point != -1) {
         solution.demand_at[old_point][k] -= instance.demand[i][k];
-        auto& old_list = solution.buildings_at[old_point];
-        old_list.erase(std::remove(old_list.begin(), old_list.end(),
-                                   std::make_pair(i, k)), old_list.end());
+        auto& old_list = solution.buildings_at[old_point][k];
+        old_list.erase(std::remove(old_list.begin(), old_list.end(), i),
+                       old_list.end());
         touched.insert(old_point);
       }
 
       solution.assignment[i][k]    = candidate;
       solution.assigned_dist[i][k] = new_dist;
       solution.demand_at[candidate][k] += instance.demand[i][k];
-      solution.buildings_at[candidate].push_back(std::make_pair(i, k));
+      solution.buildings_at[candidate][k].push_back(i);
     }
   }
 
@@ -95,35 +100,39 @@ void apply_open(SolutionState& solution, const Instance& instance, int candidate
 
 void apply_close(SolutionState& solution, const Instance& instance, int candidate) {
   // Si ya estaba cerrado, no hay nada que hacer.
-  if (!solution.open[candidate]) return;
+  if (!solution.is_open(candidate)) return;
 
-  // 1) Marcar el punto como cerrado.
-  solution.open[candidate] = false;
+  // 1) Marcar el punto como cerrado: desactivar todos sus tipos (andamiaje Paso 1).
+  for (int k = 0; k < instance.n_waste_types; ++k) {
+    solution.active[candidate][k] = false;
+  }
 
   std::set<int> touched;
 
   // 2) Tomar los huérfanos: los pares (i,k) que REALMENTE estaban en 'candidate'.
-  //    Copiamos la lista porque vamos a modificar buildings_at mientras iteramos.
-  const std::vector<std::pair<int,int>> orphans = solution.buildings_at[candidate];
-
-  // 3) Vaciar el punto cerrado: ya no sirve a nadie, sin demanda ni contenedores.
-  solution.buildings_at[candidate].clear();
+  //    Recorremos las listas por tipo y de paso vaciamos el punto cerrado
+  //    (ya no sirve a nadie: sin buildings, sin demanda, sin contenedores).
+  std::vector<std::pair<int,int>> orphans;
   for (int k = 0; k < instance.n_waste_types; ++k) {
+    for (int i : solution.buildings_at[candidate][k]) {
+      orphans.emplace_back(i, k);
+    }
+    solution.buildings_at[candidate][k].clear();
     solution.demand_at[candidate][k] = 0.0;
     solution.bins[candidate][k]      = 0;
   }
 
-  // 4) Reasignar cada huérfano a su siguiente punto abierto más cercano.
+  // 3) Reasignar cada huérfano a su siguiente punto abierto más cercano.
   for (const auto& [i, k] : orphans) {
     // Buscar destino con la helper compartida (excluyendo el punto cerrado).
-    int new_point = find_nearest_open(solution, instance, i, k, candidate);
+    int new_point = find_nearest_active(solution, instance, i, k, candidate);
 
     if (new_point != -1) {
       // Necesitamos la distancia al nuevo punto: la tomamos de dist.
       solution.assignment[i][k]    = new_point;
       solution.assigned_dist[i][k] = instance.dist[new_point].at(i);
       solution.demand_at[new_point][k] += instance.demand[i][k];
-      solution.buildings_at[new_point].push_back(std::make_pair(i, k));
+      solution.buildings_at[new_point][k].push_back(i);
       touched.insert(new_point);
     } else {
       solution.assignment[i][k]    = -1;
@@ -131,7 +140,7 @@ void apply_close(SolutionState& solution, const Instance& instance, int candidat
     }
   }
 
-  // 5) Recalcular los contenedores de los puntos que recibieron huérfanos.
+  // 4) Recalcular los contenedores de los puntos que recibieron huérfanos.
   for (int point : touched) {
     for (int k = 0; k < instance.n_waste_types; ++k) {
       recompute_bins(solution, instance, point, k);
@@ -139,6 +148,95 @@ void apply_close(SolutionState& solution, const Instance& instance, int candidat
   }
 
   // (No se toca total_cost ni los contadores de violación: eso es de compute_cost.)
+}
+
+
+void apply_activate(SolutionState& solution, const Instance& instance,
+                    int candidate, int type) {
+  // No-op si el tipo ya estaba activo: así el flip z[j] solo se evalúa con cambio real.
+  if (solution.active[candidate][type]) return;
+
+  // --- Acoplamiento z[j]: cobrar apertura SOLO si esta activación abre el punto ---
+  // (mirar is_open antes y después del flip; no contar tipos a mano).
+  const bool was_open = solution.is_open(candidate);
+  solution.active[candidate][type] = true;
+  const bool now_open = solution.is_open(candidate);
+  if (!was_open && now_open) {
+    solution.total_cost += instance.candidates[candidate].opening_cost;
+  }
+
+  std::set<int> touched;   // puntos cuya demanda del tipo 'type' cambia
+  touched.insert(candidate);
+
+  // Atraer los edificios de tipo 'type' para los que 'candidate' es ahora el punto
+  // ACTIVO más cercano (misma lógica que apply_open, restringida a un solo tipo).
+  for (const BuildingType& bt : instance.buildings_of[candidate]) {
+    if (bt.k != type) continue;               // solo el tipo que activamos
+    const int    i        = bt.i;
+    const double new_dist = bt.distance;
+
+    if (new_dist < solution.assigned_dist[i][type]) {
+      const int old_point = solution.assignment[i][type];
+      if (old_point != -1) {
+        solution.demand_at[old_point][type] -= instance.demand[i][type];
+        auto& old_list = solution.buildings_at[old_point][type];
+        old_list.erase(std::remove(old_list.begin(), old_list.end(), i),
+                       old_list.end());
+        touched.insert(old_point);
+      }
+      solution.assignment[i][type]    = candidate;
+      solution.assigned_dist[i][type] = new_dist;
+      solution.demand_at[candidate][type] += instance.demand[i][type];
+      solution.buildings_at[candidate][type].push_back(i);
+    }
+  }
+
+  // Solo cambió la demanda del tipo 'type': recalcular SUS bins en los tocados.
+  for (int point : touched) {
+    recompute_bins(solution, instance, point, type);
+  }
+}
+
+
+void apply_deactivate(SolutionState& solution, const Instance& instance,
+                      int candidate, int type) {
+  // No-op si el tipo ya estaba inactivo.
+  if (!solution.active[candidate][type]) return;
+
+  // --- Acoplamiento z[j]: reembolsar apertura SOLO si esta desactivación cierra el punto ---
+  const bool was_open = solution.is_open(candidate);
+  solution.active[candidate][type] = false;
+  const bool now_open = solution.is_open(candidate);
+  if (was_open && !now_open) {
+    solution.total_cost -= instance.candidates[candidate].opening_cost;
+  }
+
+  // Huérfanos del tipo 'type' en 'candidate'; de paso vaciar ese (punto, tipo).
+  const std::vector<int> orphans = solution.buildings_at[candidate][type];
+  solution.buildings_at[candidate][type].clear();
+  solution.demand_at[candidate][type] = 0.0;
+  solution.bins[candidate][type]      = 0;
+
+  std::set<int> touched;
+
+  // Reasignar cada huérfano a su siguiente punto con el tipo 'type' ACTIVO.
+  for (int i : orphans) {
+    const int new_point = find_nearest_active(solution, instance, i, type, candidate);
+    if (new_point != -1) {
+      solution.assignment[i][type]    = new_point;
+      solution.assigned_dist[i][type] = instance.dist[new_point].at(i);
+      solution.demand_at[new_point][type] += instance.demand[i][type];
+      solution.buildings_at[new_point][type].push_back(i);
+      touched.insert(new_point);
+    } else {
+      solution.assignment[i][type]    = -1;
+      solution.assigned_dist[i][type] = std::numeric_limits<double>::infinity();
+    }
+  }
+
+  for (int point : touched) {
+    recompute_bins(solution, instance, point, type);
+  }
 }
 
 
@@ -156,9 +254,9 @@ void compute_cost(SolutionState& solution, const Instance& instance, double rho)
 
   // Recorremos cada punto candidato.
   for (int j = 0; j < n_candidates; ++j) {
-    if (!solution.open[j]) continue;
+    if (!solution.is_open(j)) continue;
 
-    // Coste de apertura del punto.
+    // Coste de apertura del punto (z[j]: se paga una vez por punto abierto).
     cost += instance.candidates[j].opening_cost;
 
     // Coste de los contenedores, y de paso contar el total para la violación.
