@@ -194,12 +194,13 @@ double delta_swap(const SolutionState& solution, const Instance& instance,
     const int i = bt.i;
     const int k = bt.k;
 
-    // Distancia a la asignación actual del edificio. Si estaba en j_out (que se
-    // cierra), esa asignación ya no vale → infinito, para que migre a j_in.
-    double current_dist = solution.assigned_dist[i][k];
-    if (solution.assignment[i][k] == j_out) {
-      current_dist = std::numeric_limits<double>::infinity();
-    }
+    // Los edificios que estaban en j_out ya los reasigna la Sección 1 (a su
+    // nearest-open, que puede ser j_in u otro punto abierto). NO volver a
+    // tocarlos aquí: hacerlo los sumaría por segunda vez a j_in (doble conteo).
+    if (solution.assignment[i][k] == j_out) continue;
+
+    // Distancia a la asignación actual del edificio.
+    const double current_dist = solution.assigned_dist[i][k];
 
     if (bt.distance < current_dist) {
       // Este edificio migra a j_in.

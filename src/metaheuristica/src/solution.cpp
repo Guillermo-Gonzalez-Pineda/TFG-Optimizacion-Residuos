@@ -2,6 +2,7 @@
 
 
 int bins_for_demand(double demand, double capacity) {
+  if (demand <= 1e-9) return 0;   // residuo FP de un punto vaciado (~1e-14): no es demanda real
   return static_cast<int>(std::ceil(demand / capacity));
 }
 
