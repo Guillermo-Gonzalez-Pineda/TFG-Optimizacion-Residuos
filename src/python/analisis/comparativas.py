@@ -90,6 +90,62 @@ def tabla_resumen(sols: Sequence[Solucion]) -> pd.DataFrame:
     return df.sort_values(["metodo", "tam"]).reset_index(drop=True)
 
 
+# Columnas (en español) de la tabla comparativa de instancias, en orden.
+_COLS_INSTANCIAS = [
+    "tam", "n_edificios", "n_candidatos", "poblacion", "reales", "artificiales",
+    "sin_cobertura_algun_tipo", "n_outliers", "pct_demanda_outliers",
+    "dist_media", "dist_max", "area_km2", "densidad_hab_km2",
+    "grafo_conexo", "aristas_largas",
+]
+
+
+def _sub(fila: dict, bloque: str, clave: str) -> Any:
+    """Lee ``fila[bloque][clave]`` con tolerancia: NaN si falta el bloque o la
+    clave (así una instancia sin algún cómputo no rompe la tabla)."""
+    sub = fila.get(bloque)
+    return sub.get(clave, math.nan) if isinstance(sub, dict) else math.nan
+
+
+def tabla_instancias(filas: Sequence[dict]) -> pd.DataFrame:
+    """Una fila por instancia, aplanando dicts de métricas/geo YA calculados.
+
+    ``comparativas`` es geo-free: esta función NO calcula métricas ni importa
+    ``geo``/``mapas``; solo FORMATEA lo que recibe (igual que ``tabla_resumen``
+    recibe objetos ``Solucion``). Quien llame — el cuaderno — invoca ``metricas.*``
+    y ``geo.*`` y pasa aquí, por instancia, un dict con estos bloques:
+
+        {"tam", "n_buildings", "n_candidates", "total_population",
+         "cobertura":  metricas.cobertura_por_tipo(inst),
+         "outliers":   metricas.outliers_demanda_iqr(inst),
+         "candidatos": metricas.candidatos_reales_vs_artificiales(inst),
+         "distancias": metricas.resumen_distancias(inst),
+         "densidad":   geo.densidad_convexhull(inst),
+         "grafo":      geo.validar_grafo(inst)}
+
+    Cualquier bloque o clave ausente se rellena con NaN (no rompe la fila)."""
+    registros = []
+    for fila in filas:
+        registros.append({
+            "tam":                      fila.get("tam", math.nan),
+            "n_edificios":              fila.get("n_buildings", math.nan),
+            "n_candidatos":             fila.get("n_candidates", math.nan),
+            "poblacion":                fila.get("total_population", math.nan),
+            "reales":                   _sub(fila, "candidatos", "reales"),
+            "artificiales":             _sub(fila, "candidatos", "artificiales"),
+            "sin_cobertura_algun_tipo": _sub(fila, "cobertura", "sin_cobertura_algun_tipo"),
+            "n_outliers":               _sub(fila, "outliers", "n_outliers"),
+            "pct_demanda_outliers":     _sub(fila, "outliers", "pct_demanda_outliers"),
+            "dist_media":               _sub(fila, "distancias", "media"),
+            "dist_max":                 _sub(fila, "distancias", "max"),
+            "area_km2":                 _sub(fila, "densidad", "area_km2"),
+            "densidad_hab_km2":         _sub(fila, "densidad", "densidad_hab_km2"),
+            "grafo_conexo":             _sub(fila, "grafo", "es_conexo"),
+            "aristas_largas":           _sub(fila, "grafo", "n_aristas_largas"),
+        })
+    df = pd.DataFrame(registros, columns=_COLS_INSTANCIAS)
+    return df.sort_values("tam").reset_index(drop=True)
+
+
 def tabla_matplotlib(df: pd.DataFrame, titulo: str | None = None, ax=None):
     """Renderiza un DataFrame como tabla estilada (cabecera oscura con texto
     blanco en negrita, filas alternas). Unifica el estilo de 02c3 y 03c5."""
