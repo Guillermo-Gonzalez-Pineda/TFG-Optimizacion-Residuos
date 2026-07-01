@@ -45,6 +45,10 @@ from .metricas import (
     violaciones_capacidad,
     demanda_por_punto,
     resumen,
+    outliers_demanda_iqr,
+    cobertura_por_tipo,
+    candidatos_reales_vs_artificiales,
+    resumen_distancias,
 )
 # `estilo` son constantes puras (sin matplotlib): es seguro re-exportarlo.
 from . import estilo
@@ -87,6 +91,10 @@ __all__ = [
     "violaciones_capacidad",
     "demanda_por_punto",
     "resumen",
+    "outliers_demanda_iqr",
+    "cobertura_por_tipo",
+    "candidatos_reales_vs_artificiales",
+    "resumen_distancias",
     # estilo (constantes puras)
     "estilo",
     "TIPOS_RESIDUO",

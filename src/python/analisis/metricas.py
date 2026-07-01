@@ -19,6 +19,8 @@ Factoriza las métricas que hoy están inline y duplicadas en los cuadernos 02 y
 
 from __future__ import annotations
 
+import numpy as np                      # geo-free: solo cálculo numérico (percentiles, stats)
+
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:                       # evita acoplar el import en tiempo de ejecución
@@ -136,4 +138,107 @@ def resumen(sol: dict, inst: "Instance" | None = None) -> dict[str, Any]:
         "bins_por_tipo": bins_por_tipo(sol, n_k),
         "gap": gap(sol),
         "n_violaciones_capacidad": len(violaciones),
+    }
+
+
+# ─────────────────── Métricas de INSTANCIA (geo-free) ───────────────────────
+# Operan solo sobre la ``Instance`` (I/J/dij/params), SIN tocar la pila
+# geográfica (osmnx/geopandas/shapely/pyproj): eso vive en el módulo ``mapas``.
+# Las consume el cuaderno 01 (validación de instancias).
+#
+# Orientación de ``inst.dij``: ``dij[j][i]`` = distancia del candidato ``j`` al
+# edificio ``i`` (clave externa = candidato, interna = edificio; cf. instancia.py).
+# Un candidato puede tener su dict interno VACÍO (sin edificios en rango): se
+# tolera sin romper (no aporta cobertura ni distancias).
+
+
+def outliers_demanda_iqr(inst: "Instance", factor: float = 1.5) -> dict[str, Any]:
+    """Outliers de demanda por la regla del rango intercuartílico (IQR).
+
+    Marca como outlier todo edificio con ``h_i > Q3 + factor·(Q3 − Q1)`` sobre el
+    conjunto ``{h_i}``. Devuelve el umbral, los índices de edificio outlier y el
+    peso que su demanda representa sobre el total."""
+    h = np.array([edif.h_i for edif in inst.I.values()], dtype=float)
+    q1, q3 = np.percentile(h, [25, 75])
+    umbral = float(q3 + factor * (q3 - q1))
+
+    indices = [i for i, edif in inst.I.items() if edif.h_i > umbral]
+    demanda_total = float(h.sum())
+    demanda_outliers = float(sum(inst.I[i].h_i for i in indices))
+    pct = demanda_outliers / demanda_total if demanda_total else 0.0
+
+    return {
+        "umbral": umbral,
+        "indices": indices,
+        "n_outliers": len(indices),
+        "demanda_total": demanda_total,
+        "demanda_outliers": demanda_outliers,
+        "pct_demanda_outliers": pct,
+    }
+
+
+def cobertura_por_tipo(inst: "Instance") -> dict[str, Any]:
+    """Cobertura por tipo de residuo: cuántos candidatos alcanzan cada edificio
+    dentro de ``coverage_radius[k]``.
+
+    Para cada tipo ``k`` cuenta, por edificio, el nº de candidatos ``j`` con
+    ``dij[j][i] ≤ coverage_radius[k]`` y resume ``acc_media/acc_min/acc_max`` y
+    cuántos edificios quedan sin ningún candidato. Como ``d ≤ r_pequeño`` implica
+    ``d ≤ r_grande``, ``edificios_sin_cobertura`` es NO CRECIENTE al crecer el
+    radio (invariante que valida de paso la orientación de ``dij``)."""
+    cobertura = inst.params.coverage_radius
+    # conteo[k][i] = nº de candidatos que cubren el edificio i para el tipo k.
+    conteo = {k: {i: 0 for i in inst.I} for k in inst.K}
+    for inner in inst.dij.values():                 # inner = {edificio_i: distancia}
+        for i, d in inner.items():
+            for k in inst.K:
+                if d <= cobertura[k]:
+                    conteo[k][i] += 1
+
+    por_tipo: dict[int, dict] = {}
+    sin_cobertura_algun: set[int] = set()
+    for k in inst.K:
+        valores = list(conteo[k].values())
+        sin_cob = [i for i, c in conteo[k].items() if c == 0]
+        por_tipo[k] = {
+            "acc_media": sum(valores) / len(valores) if valores else 0.0,
+            "acc_min": min(valores) if valores else 0,
+            "acc_max": max(valores) if valores else 0,
+            "edificios_sin_cobertura": len(sin_cob),
+        }
+        sin_cobertura_algun.update(sin_cob)
+
+    return {"por_tipo": por_tipo, "sin_cobertura_algun_tipo": len(sin_cobertura_algun)}
+
+
+def candidatos_reales_vs_artificiales(inst: "Instance") -> dict[str, int]:
+    """Reparte los candidatos en reales vs artificiales.
+
+    Un candidato es ARTIFICIAL si su ``osm_id`` empieza por ``"-"`` (id negativo
+    insertado sobre una arista para garantizar cobertura); el resto son reales."""
+    artificiales = sum(1 for cand in inst.J.values() if str(cand.osm_id).startswith("-"))
+    total = len(inst.J)
+    return {"total": total, "reales": total - artificiales, "artificiales": artificiales}
+
+
+def resumen_distancias(inst: "Instance") -> dict[str, Any]:
+    """Estadística de las distancias edificio↔candidato de ``inst.dij``.
+
+    ``n_sobre_cutoff`` usa el radio de Dijkstra de la instancia
+    (``inst.dijkstra_radius_m``) como cutoff: ninguna distancia debería superarlo."""
+    dists = np.array([d for inner in inst.dij.values() for d in inner.values()],
+                     dtype=float)
+    cutoff = inst.dijkstra_radius_m
+    if dists.size == 0:
+        return {"n": 0, "min": None, "media": None, "mediana": None, "max": None,
+                "n_cero": 0, "n_sub5": 0, "n_sobre_cutoff": 0}
+    return {
+        "n": int(dists.size),
+        "min": float(dists.min()),
+        "media": float(dists.mean()),
+        "mediana": float(np.median(dists)),
+        "max": float(dists.max()),
+        "n_cero": int(np.sum(dists == 0)),
+        "n_sub5": int(np.sum(dists < 5)),
+        "n_sobre_cutoff": int(np.sum(dists > cutoff)),
     }
