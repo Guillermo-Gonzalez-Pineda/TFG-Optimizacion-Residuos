@@ -101,6 +101,25 @@ def violaciones_capacidad(sol: dict, inst: "Instance") -> list[dict]:
     return sorted(violaciones, key=lambda v: v["punto"])
 
 
+def demanda_por_punto(sol: dict, inst: "Instance", k: int = 0) -> dict[int, float]:
+    """Demanda (población) que cada punto recibe del tipo de residuo ``k``.
+
+    Para cada edificio ``i`` asignado al punto ``j`` en el tipo ``k``
+    (``y_assign[(i, k)] == j``), acumula su población ``inst.I[i].h_i`` en ``j``.
+    Devuelve ``{j: demanda}`` solo con los puntos que reciben algo del tipo ``k``.
+
+    Salta las asignaciones no factibles (``j < 0``, p. ej. ``-1`` = sin asignar).
+    En una solución factible completa cada edificio asigna su tipo ``k`` a un único
+    punto, de modo que ``Σ_j demanda_por_punto(sol, inst, k)[j]`` es la población
+    total de la instancia, igual para todo ``k`` (invariante de conservación)."""
+    demanda: dict[int, float] = {}
+    for (i, kk), j in sol["y_assign"].items():
+        if kk != k or j < 0:
+            continue
+        demanda[j] = demanda.get(j, 0.0) + inst.I[i].h_i
+    return demanda
+
+
 def resumen(sol: dict, inst: "Instance" | None = None) -> dict[str, Any]:
     """Una fila de métricas para tablas comparativas, agnóstica al método:
     coste, nº de puntos abiertos, total de contenedores, desglose por tipo, gap y

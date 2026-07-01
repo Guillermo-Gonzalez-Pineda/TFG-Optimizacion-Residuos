@@ -43,6 +43,7 @@ from .metricas import (
     gap,
     desglose_coste,
     violaciones_capacidad,
+    demanda_por_punto,
     resumen,
 )
 # `estilo` son constantes puras (sin matplotlib): es seguro re-exportarlo.
@@ -84,6 +85,7 @@ __all__ = [
     "gap",
     "desglose_coste",
     "violaciones_capacidad",
+    "demanda_por_punto",
     "resumen",
     # estilo (constantes puras)
     "estilo",
