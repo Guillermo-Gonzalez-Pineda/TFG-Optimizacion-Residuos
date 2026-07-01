@@ -42,10 +42,14 @@ static bool is_feasible(const SolutionState& s) {
 SolutionState tabu_search(SolutionState solution, const Instance& instance,
                           const TabuParams& params) {
   const int n_candidates = instance.n_candidates;
-  const double rho = params.rho;
+  double current_rho = params.rho;          // rho evoluciona durante la búsqueda
+  const double rho_base = params.rho;       // valor al que resetear
+  const double rho_factor = 1.5;            // cuánto sube cada vez
+  const int rho_patience = 50;              // iteraciones sin factible antes de subir
+  int iters_since_feasible = 0;
 
   // Coste de partida.
-  compute_cost(solution, instance, rho);
+  compute_cost(solution, instance, current_rho);
 
   // Récords: mejor global (para aspiración) y mejor factible (lo que devolvemos).
   SolutionState best_global   = solution;
@@ -71,7 +75,7 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
     for (int j = 0; j < n_candidates; ++j) {
       if (solution.open[j]) {
         // CERRAR j
-        double d = delta_close(solution, instance, j, rho);
+        double d = delta_close(solution, instance, j, current_rho);
         bool tabu_move = tabu.is_close_forbidden(j, iter);
         bool aspires = (solution.total_cost + d < best_global.total_cost);
         if ((!tabu_move || aspires) && d < best_delta) {
@@ -79,7 +83,7 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
         }
       } else {
         // ABRIR j
-        double d = delta_open(solution, instance, j, rho);
+        double d = delta_open(solution, instance, j, current_rho);
         bool tabu_move = tabu.is_open_forbidden(j, iter);
         bool aspires = (solution.total_cost + d < best_global.total_cost);
         if ((!tabu_move || aspires) && d < best_delta) {
@@ -105,7 +109,7 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
       }
 
       for (int j_in : nearby_closed) {
-        double d = delta_swap(solution, instance, j_out, j_in, rho);
+        double d = delta_swap(solution, instance, j_out, j_in, current_rho);
         bool tabu_move = tabu.is_close_forbidden(j_out, iter) ||
                          tabu.is_open_forbidden(j_in, iter);
         bool aspires = (solution.total_cost + d < best_global.total_cost);
@@ -138,7 +142,7 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
     }
 
     // Recalcular el coste de la nueva solución actual.
-    compute_cost(solution, instance, rho);
+    compute_cost(solution, instance, current_rho);
 
     // Actualizar récord global (para aspiración).
     if (solution.total_cost < best_global.total_cost) {
@@ -150,6 +154,26 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
         (!have_feasible || solution.total_cost < best_feasible.total_cost)) {
       best_feasible = solution;
       have_feasible = true;
+    }
+
+    // --- Penalización rho ADAPTATIVA ---
+    // Si la solución actual es factible, la penalización no ha hecho falta:
+    // reseteamos rho a su valor base (y recalculamos coste, que depende de rho).
+    // Si llevamos `rho_patience` iteraciones sin pisar factibilidad, subimos rho
+    // para empujar la búsqueda hacia soluciones sin violaciones.
+    if (is_feasible(solution)) {
+      iters_since_feasible = 0;
+      if (current_rho != rho_base) {
+        current_rho = rho_base;
+        compute_cost(solution, instance, current_rho);  // recalcular con rho reseteado
+      }
+    } else {
+      iters_since_feasible++;
+      if (iters_since_feasible >= rho_patience) {
+        current_rho = std::min(current_rho * rho_factor, rho_base * 1e6);
+        iters_since_feasible = 0;
+        compute_cost(solution, instance, current_rho);  // recalcular con rho subido
+      }
     }
 
     // --- Heartbeat ---
@@ -164,6 +188,7 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
       std::cout << " | delta: " << best_delta
                 << " | coste: " << solution.total_cost
                 << " | mejor fact: " << (have_feasible ? best_feasible.total_cost : -1)
+                << " | rho: " << current_rho
                 << " | t: " << elapsed_s << "s"
                 << "\n";
     }

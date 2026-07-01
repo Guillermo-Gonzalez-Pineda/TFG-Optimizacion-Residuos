@@ -141,11 +141,117 @@ double delta_open(const SolutionState& solution, const Instance& instance,
   return delta;
 }
 
+// Devuelve (creándolo si no existe) el vector de cambios de demanda del punto p
+// dentro del mapa net_demand. Si p es nuevo, lo inicializa con n_types ceros.
+static std::vector<double>& demand_change_of(
+    std::unordered_map<int, std::vector<double>>& net_demand,
+    int p, int n_types) {
+  auto it = net_demand.find(p);
+  if (it == net_demand.end()) {
+    it = net_demand.emplace(p, std::vector<double>(n_types, 0.0)).first;
+  }
+  return it->second;
+}
+
 
 double delta_swap(const SolutionState& solution, const Instance& instance,
                   int j_out, int j_in, double rho) {
-  SolutionState copy = solution;          // copia para no mutar el original
-  apply_swap(copy, instance, j_out, j_in);
-  compute_cost(copy, instance, rho);
-  return copy.total_cost - solution.total_cost;
+  const int n_types  = instance.n_waste_types;
+  const int max_bins = instance.params.max_bins;
+
+  double delta = 0.0;
+
+  // Cambio de demanda por punto afectado. Local: no toca el estado.
+  std::unordered_map<int, std::vector<double>> net_demand;
+
+  int new_coverage = 0;   // cambio neto en violaciones de cobertura
+
+  // --- 1) Cerrar j_out: ahorrar su apertura y reubicar sus edificios ---
+  delta -= instance.candidates[j_out].opening_cost;
+
+  for (const auto& [i, k] : solution.buildings_at[j_out]) {
+    // Buscar destino: el más cercano que esté abierto (tratando j_in como abierto,
+    // porque el swap lo abre) y que no sea j_out (que se cierra).
+    int dest = -1;
+    for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
+      if (vc.j == j_out) continue;
+      if (vc.j == j_in || solution.open[vc.j]) {
+        dest = vc.j;
+        break;
+      }
+    }
+    if (dest == -1) {
+      new_coverage++;   // ningún destino: queda descubierto
+    } else {
+      demand_change_of(net_demand, dest, n_types)[k] += instance.demand[i][k];
+    }
+  }
+
+  // --- 2) Abrir j_in: pagar su apertura y atraer los edificios que le queden más cerca ---
+  delta += instance.candidates[j_in].opening_cost;
+
+  for (const BuildingType& bt : instance.buildings_of[j_in]) {
+    const int i = bt.i;
+    const int k = bt.k;
+
+    // Distancia a la asignación actual del edificio. Si estaba en j_out (que se
+    // cierra), esa asignación ya no vale → infinito, para que migre a j_in.
+    double current_dist = solution.assigned_dist[i][k];
+    if (solution.assignment[i][k] == j_out) {
+      current_dist = std::numeric_limits<double>::infinity();
+    }
+
+    if (bt.distance < current_dist) {
+      // Este edificio migra a j_in.
+      demand_change_of(net_demand, j_in, n_types)[k] += instance.demand[i][k];
+
+      const int old = solution.assignment[i][k];
+      if (old == -1) {
+        new_coverage--;   // estaba descubierto → j_in lo cubre
+      } else if (old != j_out) {
+        // Su punto antiguo pierde esta demanda. (Si venía de j_out, ya se contó arriba.)
+        demand_change_of(net_demand, old, n_types)[k] -= instance.demand[i][k];
+      }
+    }
+  }
+
+  delta += rho * new_coverage;
+
+
+  // --- 3) Traducir cada cambio de demanda a cambio de coste de contenedores ---
+  for (const auto& [point, change] : net_demand) {
+    int bins_before_total = 0;
+    int bins_after_total  = 0;
+
+    for (int k = 0; k < n_types; ++k) {
+      // Para j_out la base efectiva es 0 (se cierra); para el resto, su demanda actual.
+      const double base      = (point == j_out) ? 0.0 : solution.demand_at[point][k];
+      const int    bins_now  = (point == j_out) ? 0   : solution.bins[point][k];
+      const int    bins_after = bins_for_demand(base + change[k],
+                                    instance.params.bin_capacity[k]);
+
+      delta += (bins_after - bins_now) * instance.params.bin_cost[k];
+      bins_before_total += bins_now;
+      bins_after_total  += bins_after;
+    }
+
+    // Cambio de saturación (j_out se cierra, no puede saturar).
+    if (point != j_out) {
+      bool sat_before = (bins_before_total > max_bins);
+      bool sat_after  = (bins_after_total  > max_bins);
+      if (!sat_before && sat_after) delta += rho;
+      if (sat_before && !sat_after) delta -= rho;
+    }
+  }
+
+
+  // --- 4) Quitar el coste de los contenedores actuales de j_out (se cierra) ---
+  int bins_out_total = 0;
+  for (int k = 0; k < n_types; ++k) {
+    delta -= solution.bins[j_out][k] * instance.params.bin_cost[k];
+    bins_out_total += solution.bins[j_out][k];
+  }
+  if (bins_out_total > max_bins) delta -= rho;   // dejaba de estar saturado
+
+  return delta;
 }
