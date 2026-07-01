@@ -5,20 +5,21 @@ Replica la ESTRUCTURA del modelo exacto (modelo_exacto.py) para permitir
 comparación fichero-a-fichero:
 
     output/lagrangiana_{R}m/
-        solucion_lagrangiana.pkl          (dicts z/x/w/y_assign + metadatos)
+        solucion_lagrangiana.json         (dicts z/x/w/y_assign + metadatos)
         solucion_lagrangiana_resumen.json (mismas claves que el exacto + extras)
 
 Las estructuras de solución (z, x, w, y_assign) se guardan en el MISMO
-formato de dict con claves-tupla que el exacto. Se añaden los campos
-propios de una relajación (LB, gap dual, iteraciones, motivo de parada,
-desglose de coste fijo/variable) que el exacto no tiene.
+formato que el exacto: JSON anidado sin pérdida (módulo `analisis.serializacion`),
+con las claves-tupla x[(j,k)]/w[(j,k)]/y_assign[(i,k)] serializadas {"j": {"k": v}}
+y z[j] como {"j": v}. Se añaden los campos propios de una relajación (LB, gap
+dual, iteraciones, motivo de parada, desglose de coste fijo/variable) que el
+exacto no tiene.
 """
 
 from __future__ import annotations
 
 import os
 import json
-import pickle
 
 import numpy as np
 
@@ -60,7 +61,7 @@ def guardar_solucion(
 ) -> tuple[str, str]:
     """
     Guarda la solución de la relajación en `output_dir`, en formato espejo
-    del exacto. Devuelve (ruta_pkl, ruta_json).
+    del exacto. Devuelve (ruta_solucion_json, ruta_resumen_json).
 
     Si no hay solución factible (best_feasible None), guarda igualmente el
     resumen con cost=null y feasible=False, para no perder LB/diagnóstico.
@@ -88,8 +89,11 @@ def guardar_solucion(
         cost = None
         feasible = False
 
-    # ── 1. Pickle completo ────────────────────────────────────────
-    pkl_path = os.path.join(output_dir, "solucion_lagrangiana.pkl")
+    # ── 1. Solución COMPLETA en JSON (claves-tupla anidadas, sin pérdida) ──
+    from analisis.serializacion import documento_solucion, guardar_documento
+    from analisis.carga import cargar_solucion
+
+    sol_path = os.path.join(output_dir, "solucion_lagrangiana.json")
     payload = {
         **sol_dicts,                       # z, x, w, y_assign (formato exacto)
         "cost": cost,                      # = best_ub (UB factible entregado)
@@ -107,13 +111,11 @@ def guardar_solucion(
         "lb_history": result.lb_history,
         "ub_history": result.ub_history,
     }
-    with open(pkl_path, "wb") as f:
-        pickle.dump(payload, f)
+    guardar_documento(documento_solucion(payload, "lagrangiana"), sol_path)
 
-    # Verificación de integridad (como el exacto)
-    with open(pkl_path, "rb") as f:
-        check = pickle.load(f)
-    assert check["best_ub"] == result.best_ub, "ERROR: pickle corrupto"
+    # Verificación de integridad (round-trip, como el exacto)
+    check = cargar_solucion(sol_path)
+    assert check["best_ub"] == result.best_ub, "ERROR: JSON corrupto"
     assert len(check["lb_history"]) == len(result.lb_history), "ERROR: historial perdido"
 
     # ── 2. Resumen JSON (claves del exacto + extras) ──────────────
@@ -141,7 +143,7 @@ def guardar_solucion(
         json.dump(resumen, f, indent=2)
 
     if verbose:
-        print(f"  Pickle guardado y verificado: {pkl_path}")
-        print(f"  Resumen JSON:                 {json_path}")
+        print(f"  Solución JSON guardada y verificada: {sol_path}")
+        print(f"  Resumen JSON:                        {json_path}")
 
-    return pkl_path, json_path
+    return sol_path, json_path

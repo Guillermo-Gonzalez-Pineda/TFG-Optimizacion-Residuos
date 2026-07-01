@@ -187,22 +187,24 @@ if __name__ == "__main__":
 
     # ── Guardar solución para análisis posterior ──────────
     if result["cost"] is not None:
-        import pickle, json
+        import json
+        from analisis.serializacion import documento_solucion, guardar_documento
+        from analisis.carga import cargar_solucion
 
         os.makedirs(output_dir, exist_ok=True)
 
-        # 1. Pickle completo (preserva claves tupla)
-        pkl_path = f"{output_dir}/solucion_exacta.pkl"
-        with open(pkl_path, "wb") as f:
-            pickle.dump(result, f)
+        # 1. Solución COMPLETA en JSON (claves-tupla anidadas, sin pérdida)
+        sol_path = f"{output_dir}/solucion_exacta.json"
+        guardar_documento(documento_solucion(result, "exacto"), sol_path)
 
-        # 2. Verificar que se guardó correctamente
-        with open(pkl_path, "rb") as f:
-            check = pickle.load(f)
-        assert check["cost"] == result["cost"], "ERROR: pickle corrupto"
+        # 2. Verificar round-trip: recargar y comprobar que no se perdió nada
+        check = cargar_solucion(sol_path)
+        assert check["cost"] == result["cost"], "ERROR: JSON corrupto"
         assert len(check["y_assign"]) == len(result["y_assign"]), "ERROR: asignaciones perdidas"
+        assert check["x"] == result["x"], "ERROR: contenedores perdidos"
+        assert check["z"] == result["z"], "ERROR: puntos abiertos perdidos"
 
-        # 3. Resumen legible en JSON (backup sin claves tupla)
+        # 3. Resumen legible en JSON (sin claves tupla)
         json_path = f"{output_dir}/solucion_exacta_resumen.json"
         resumen = {
             "cost": result["cost"],
@@ -220,9 +222,9 @@ if __name__ == "__main__":
         with open(json_path, "w") as f:
             json.dump(resumen, f, indent=2)
 
-        print(f"  ✅ Pickle guardado y verificado: {pkl_path}")
-        print(f"  ✅ Resumen JSON:                 {json_path}")
-        print(f"     Contenido del pickle:")
+        print(f"  ✅ Solución JSON guardada y verificada: {sol_path}")
+        print(f"  ✅ Resumen JSON:                        {json_path}")
+        print(f"     Contenido de la solución:")
         print(f"       z:        {len(result['z'])} entries")
         print(f"       x:        {len(result['x'])} entries")
         print(f"       w:        {len(result['w'])} entries")
