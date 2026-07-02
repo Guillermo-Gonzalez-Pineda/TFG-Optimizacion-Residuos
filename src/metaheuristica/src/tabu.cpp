@@ -15,10 +15,12 @@
 
 
 
-/** Inicializa para n_candidates puntos, sin ningún veto activo. */
-void TabuList::init(int n_candidates) {
+/** Inicializa para n_candidates puntos y n_types tipos, sin ningún veto activo. */
+void TabuList::init(int n_candidates, int n_types) {
   forbid_open_until.assign(n_candidates, -1);
   forbid_close_until.assign(n_candidates, -1);
+  forbid_activate_until.assign(n_candidates, std::vector<int>(n_types, -1));
+  forbid_deactivate_until.assign(n_candidates, std::vector<int>(n_types, -1));
 }
 
 /** ¿Está vetado ABRIR el punto j en la iteración actual? */
@@ -39,6 +41,26 @@ void TabuList::mark_closed(int j, int current_iter, int tenure) {
 /** Tras ABRIR j: prohibir CERRARLO durante `tenure` iteraciones. */
 void TabuList::mark_opened(int j, int current_iter, int tenure) {
   forbid_close_until[j] = current_iter + tenure;
+}
+
+/** ¿Está vetado ACTIVAR el tipo k en el punto j? */
+bool TabuList::is_activate_forbidden(int j, int k, int current_iter) const {
+  return forbid_activate_until[j][k] >= current_iter;
+}
+
+/** ¿Está vetado DESACTIVAR el tipo k en el punto j? */
+bool TabuList::is_deactivate_forbidden(int j, int k, int current_iter) const {
+  return forbid_deactivate_until[j][k] >= current_iter;
+}
+
+/** Tras ACTIVAR (j,k): prohibir DESACTIVAR ese tipo en ese punto un tenure. */
+void TabuList::mark_activated(int j, int k, int current_iter, int tenure) {
+  forbid_deactivate_until[j][k] = current_iter + tenure;
+}
+
+/** Tras DESACTIVAR (j,k): prohibir REACTIVAR ese tipo en ese punto un tenure. */
+void TabuList::mark_deactivated(int j, int k, int current_iter, int tenure) {
+  forbid_activate_until[j][k] = current_iter + tenure;
 }
 
 
@@ -105,12 +127,25 @@ static SolutionState oracle_rebuild(const SolutionState& cur,
 // reconstrucción desde cero. Si algo no cuadra, imprime diagnóstico y aborta.
 static void oracle_verify(const SolutionState& sol, const Instance& instance,
                           double rho, int iter, int move_type,
-                          int p1, int p2,
+                          int p1, int p2, int p3,
                           double cost_before, double predicted_delta) {
-  const char* mv  = (move_type == 0 ? "CERRAR" :
-                     move_type == 1 ? "ABRIR " : "SWAP  ");
-  const char* sep = (move_type == 2 ? "<->" : "");
-  const int   q2  = (move_type == 2 ? p2 : -1);
+  // Etiqueta del movimiento. Para el swap por tipo se inyecta k en la etiqueta,
+  // y p1<->p2 = j_out<->j_in en los campos habituales.
+  char mvbuf[24];
+  const char* mv;
+  if (move_type == 5) {
+    std::snprintf(mvbuf, sizeof(mvbuf), "SWAPT k=%d", p3);
+    mv = mvbuf;
+  } else {
+    mv = (move_type == 0 ? "CERRAR" :
+          move_type == 1 ? "ABRIR " :
+          move_type == 2 ? "SWAP  " :
+          move_type == 3 ? "ACTIV " : "DESACT");
+  }
+  const bool  per_type = (move_type == 3 || move_type == 4);
+  const bool  is_swap  = (move_type == 2 || move_type == 5);
+  const char* sep = is_swap ? "<->" : per_type ? " k=" : "";
+  const int   q2  = (is_swap || per_type) ? p2 : -1;
   bool ok = true;
 
   // --- (A) delta predicho vs cambio real de coste ---
@@ -203,7 +238,7 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
   bool have_feasible = is_feasible(solution);
 
   TabuList tabu;
-  tabu.init(n_candidates);
+  tabu.init(n_candidates, instance.n_waste_types);
 
   const int report_every = 100;
 
@@ -213,14 +248,18 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
   for (int iter = 0; iter < params.max_iters; ++iter) {
     // Mejor movimiento permitido de esta iteración.
     double best_delta = std::numeric_limits<double>::infinity();
-    int best_point   = -1;   // punto principal (el que se cierra/abre; en swap, j_out)
-    int best_second  = -1;   // segundo punto (solo swap: j_in)
-    int best_move_type = -1; // 0 = cerrar, 1 = abrir, 2 = swap
+    int best_point   = -1;   // punto principal (abre/cierra/activa/desactiva; swap: j_out)
+    int best_second  = -1;   // per-tipo: el tipo k; swap: j_in
+    int best_third   = -1;   // swap por tipo: el tipo k
+    int best_move_type = -1; // 0=cerrar 1=abrir 3=activar(j,k) 4=desactivar(j,k) 5=swap(j_out,j_in,k)
 
-    // --- Vecinos de abrir / cerrar ---
+    // --- Vecinos ENTEROS: abrir / cerrar el punto completo ---
+    //     Se conservan junto a los per-tipo: cerrar un punto de 4 tipos en un solo
+    //     paso reembolsa C_j de golpe (vía per-tipo solo lo haría la última
+    //     desactivación, y las intermedias no serían mejorantes → punto atascado).
     for (int j = 0; j < n_candidates; ++j) {
       if (solution.is_open(j)) {
-        // CERRAR j
+        // CERRAR j (entero)
         double d = delta_close(solution, instance, j, current_rho);
         bool tabu_move = tabu.is_close_forbidden(j, iter);
         bool aspires = (solution.total_cost + d < best_global.total_cost);
@@ -228,7 +267,7 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
           best_delta = d; best_point = j; best_second = -1; best_move_type = 0;
         }
       } else {
-        // ABRIR j
+        // ABRIR j (entero)
         double d = delta_open(solution, instance, j, current_rho);
         bool tabu_move = tabu.is_open_forbidden(j, iter);
         bool aspires = (solution.total_cost + d < best_global.total_cost);
@@ -238,31 +277,27 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
       }
     }
 
-    // --- Vecinos de swap ACOTADOS: por cada abierto, solo intercambiar por
-    //     candidatos cerrados CERCANOS (los valid_candidates de sus edificios). ---
-    for (int j_out = 0; j_out < n_candidates; ++j_out) {
-      if (!solution.is_open(j_out)) continue;
-
-      // Recoger candidatos cerrados cercanos: los valid_candidates de los
-      // edificios que j_out sirve. Usamos un set para no repetir.
-      std::set<int> nearby_closed;
+    // --- Vecinos POR TIPO: activar / desactivar un solo (j,k) ---
+    //     Esto ROMPE el régimen colapsado: un punto puede quedar con unos tipos
+    //     activos y otros no. El veto tabú aquí es por (j,k), no por punto.
+    for (int j = 0; j < n_candidates; ++j) {
       for (int k = 0; k < instance.n_waste_types; ++k) {
-        for (int i : solution.buildings_at[j_out][k]) {
-          for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
-            if (!solution.is_open(vc.j) && vc.j != j_out) {
-              nearby_closed.insert(vc.j);
-            }
+        if (solution.active[j][k]) {
+          // DESACTIVAR (j,k)
+          double d = delta_deactivate(solution, instance, j, k, current_rho);
+          bool tabu_move = tabu.is_deactivate_forbidden(j, k, iter);
+          bool aspires = (solution.total_cost + d < best_global.total_cost);
+          if ((!tabu_move || aspires) && d < best_delta) {
+            best_delta = d; best_point = j; best_second = k; best_move_type = 4;
           }
-        }
-      }
-
-      for (int j_in : nearby_closed) {
-        double d = delta_swap(solution, instance, j_out, j_in, current_rho);
-        bool tabu_move = tabu.is_close_forbidden(j_out, iter) ||
-                         tabu.is_open_forbidden(j_in, iter);
-        bool aspires = (solution.total_cost + d < best_global.total_cost);
-        if ((!tabu_move || aspires) && d < best_delta) {
-          best_delta = d; best_point = j_out; best_second = j_in; best_move_type = 2;
+        } else {
+          // ACTIVAR (j,k)  (j puede estar cerrado, o abierto con otros tipos)
+          double d = delta_activate(solution, instance, j, k, current_rho);
+          bool tabu_move = tabu.is_activate_forbidden(j, k, iter);
+          bool aspires = (solution.total_cost + d < best_global.total_cost);
+          if ((!tabu_move || aspires) && d < best_delta) {
+            best_delta = d; best_point = j; best_second = k; best_move_type = 3;
+          }
         }
       }
     }
@@ -279,21 +314,21 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
 
     // --- Aplicar el ganador con la primitiva, y marcar tabú ---
     if (best_move_type == 0) {
-      // Cerrar best_point → vetar REABRIRLO.
+      // Cerrar best_point (entero) → vetar REABRIRLO.
       apply_close(solution, instance, best_point);
       tabu.mark_closed(best_point, iter, params.tabu_tenure);
     } else if (best_move_type == 1) {
-      // Abrir best_point → vetar CERRARLO.
+      // Abrir best_point (entero) → vetar CERRARLO.
       apply_open(solution, instance, best_point);
       tabu.mark_opened(best_point, iter, params.tabu_tenure);
-    } else {
-      // Swap: best_point = j_out (se cierra), best_second = j_in (se abre).
-      // REVISAR (mañana): confirmar que el veto va al punto correcto.
-      //   - j_out se cierra → mark_closed(j_out) veta reabrirlo.
-      //   - j_in  se abre   → mark_opened(j_in)  veta cerrarlo.
-      apply_swap(solution, instance, best_point, best_second);
-      tabu.mark_closed(best_point,  iter, params.tabu_tenure);
-      tabu.mark_opened(best_second, iter, params.tabu_tenure);
+    } else if (best_move_type == 3) {
+      // Activar (j,k) → vetar DESACTIVAR ese tipo en ese punto.
+      apply_activate(solution, instance, best_point, best_second);
+      tabu.mark_activated(best_point, best_second, iter, params.tabu_tenure);
+    } else if (best_move_type == 4) {
+      // Desactivar (j,k) → vetar REACTIVAR ese tipo en ese punto.
+      apply_deactivate(solution, instance, best_point, best_second);
+      tabu.mark_deactivated(best_point, best_second, iter, params.tabu_tenure);
     }
 
     // Recalcular el coste de la nueva solución actual.
@@ -302,7 +337,7 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
 #ifdef ORACLE_CHECK
     // Verificar delta y estado con el mismo rho usado en el delta y este cómputo.
     oracle_verify(solution, instance, current_rho, iter, best_move_type,
-                  best_point, best_second,
+                  best_point, best_second, best_third,
                   oracle_cost_before, oracle_predicted_delta);
 #endif
 
@@ -344,9 +379,12 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
           std::chrono::duration<double>(
               std::chrono::steady_clock::now() - t_start).count();
       const char* move = (best_move_type == 0 ? "CERRAR" :
-                          best_move_type == 1 ? "ABRIR " : "SWAP  ");
+                          best_move_type == 1 ? "ABRIR " :
+                          best_move_type == 3 ? "ACTIV " :
+                          best_move_type == 4 ? "DESACT" : "SWAPT ");
       std::cout << "  iter " << iter << " | " << move << " " << best_point;
-      if (best_move_type == 2) std::cout << "<->" << best_second;
+      if (best_move_type == 3 || best_move_type == 4) std::cout << " k=" << best_second;
+      if (best_move_type == 5) std::cout << "<->" << best_second << " k=" << best_third;
       std::cout << " | delta: " << best_delta
                 << " | coste: " << solution.total_cost
                 << " | mejor fact: " << (have_feasible ? best_feasible.total_cost : -1)

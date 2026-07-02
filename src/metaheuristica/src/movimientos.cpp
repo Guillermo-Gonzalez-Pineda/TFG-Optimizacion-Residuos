@@ -260,3 +260,131 @@ double delta_swap(const SolutionState& solution, const Instance& instance,
 
   return delta;
 }
+
+
+double delta_activate(const SolutionState& solution, const Instance& instance,
+                      int j, int k, double rho) {
+  const int    n_types  = instance.n_waste_types;
+  const int    max_bins = instance.params.max_bins;
+  const double cap      = instance.params.bin_capacity[k];
+  const double bcost    = instance.params.bin_cost[k];
+
+  double delta = 0.0;
+
+  // 1) Apertura z[j]: activar k ABRE el punto SOLO si ahora está cerrado.
+  if (!solution.is_open(j)) {
+    delta += instance.candidates[j].opening_cost;
+  }
+
+  // 2) Edificios de tipo k para los que j pasa a ser el ACTIVO más cercano.
+  double gained = 0.0;
+  std::unordered_map<int, double> lost;   // lost[punto_antiguo] (solo tipo k)
+  for (const BuildingType& bt : instance.buildings_of[j]) {
+    if (bt.k != k) continue;              // solo el tipo que activamos
+    const int i = bt.i;
+    if (bt.distance < solution.assigned_dist[i][k]) {
+      gained += instance.demand[i][k];
+      const int old_point = solution.assignment[i][k];
+      if (old_point == -1) {
+        delta -= rho;                     // estaba descubierto → ahora cubierto
+      } else {
+        lost[old_point] += instance.demand[i][k];
+      }
+    }
+  }
+
+  // 3) Bins que j necesita para el tipo k. Parte de su demanda ACTUAL de k (0 si k
+  //    estaba inactivo). La saturación se mide sobre el TOTAL de bins de j, que
+  //    puede ser >0 si el punto ya estaba abierto con otros tipos.
+  int j_total_before = 0;
+  for (int t = 0; t < n_types; ++t) j_total_before += solution.bins[j][t];
+  const int j_bins_before_k = solution.bins[j][k];
+  const int j_bins_after_k  = bins_for_demand(solution.demand_at[j][k] + gained, cap);
+  delta += (j_bins_after_k - j_bins_before_k) * bcost;
+  const int j_total_after = j_total_before - j_bins_before_k + j_bins_after_k;
+  {
+    const bool sat_before = (j_total_before > max_bins);
+    const bool sat_after  = (j_total_after  > max_bins);
+    if (!sat_before && sat_after) delta += rho;
+    if (sat_before && !sat_after) delta -= rho;
+  }
+
+  // 4) Ahorro en los puntos antiguos que pierden demanda del tipo k.
+  for (const auto& [old_point, lost_dem] : lost) {
+    int old_total_before = 0;
+    for (int t = 0; t < n_types; ++t) old_total_before += solution.bins[old_point][t];
+    const int old_bins_before_k = solution.bins[old_point][k];
+    const int old_bins_after_k  = bins_for_demand(
+        solution.demand_at[old_point][k] - lost_dem, cap);
+    delta += (old_bins_after_k - old_bins_before_k) * bcost;   // negativo: ahorro
+    const int old_total_after = old_total_before - old_bins_before_k + old_bins_after_k;
+    const bool sat_before = (old_total_before > max_bins);
+    const bool sat_after  = (old_total_after  > max_bins);
+    if (sat_before && !sat_after) delta -= rho;
+    if (!sat_before && sat_after) delta += rho;
+  }
+
+  return delta;
+}
+
+
+double delta_deactivate(const SolutionState& solution, const Instance& instance,
+                        int j, int k, double rho) {
+  const int    n_types  = instance.n_waste_types;
+  const int    max_bins = instance.params.max_bins;
+  const double cap      = instance.params.bin_capacity[k];
+  const double bcost    = instance.params.bin_cost[k];
+
+  double delta = 0.0;
+
+  // 1) Apertura z[j]: desactivar k CIERRA el punto SOLO si k es el ÚNICO tipo
+  //    activo ahora mismo (ningún otro active[j][t]). Predicho sin mutar estado.
+  bool closes = true;
+  for (int t = 0; t < n_types; ++t) {
+    if (t != k && solution.active[j][t]) { closes = false; break; }
+  }
+  if (closes) delta -= instance.candidates[j].opening_cost;
+
+  // 2) Reubicar los huérfanos de tipo k a su siguiente punto ACTIVO más cercano.
+  std::unordered_map<int, double> extra;   // extra[destino] (solo tipo k)
+  int new_coverage = 0;
+  for (int i : solution.buildings_at[j][k]) {
+    const int dest = find_nearest_active(solution, instance, i, k, j);
+    if (dest == -1) {
+      ++new_coverage;                       // ningún destino: queda descubierto
+    } else {
+      extra[dest] += instance.demand[i][k];
+    }
+  }
+  delta += rho * new_coverage;
+
+  // 3) j pierde TODOS sus bins del tipo k.
+  int j_total_before = 0;
+  for (int t = 0; t < n_types; ++t) j_total_before += solution.bins[j][t];
+  const int j_bins_before_k = solution.bins[j][k];
+  delta -= j_bins_before_k * bcost;
+  const int j_total_after = j_total_before - j_bins_before_k;   // tipo k → 0
+  {
+    const bool sat_before = (j_total_before > max_bins);
+    const bool sat_after  = (j_total_after  > max_bins);
+    if (sat_before && !sat_after) delta -= rho;
+    if (!sat_before && sat_after) delta += rho;
+  }
+
+  // 4) Coste extra en los destinos que reciben huérfanos.
+  for (const auto& [dest, extra_dem] : extra) {
+    int dest_total_before = 0;
+    for (int t = 0; t < n_types; ++t) dest_total_before += solution.bins[dest][t];
+    const int dest_bins_before_k = solution.bins[dest][k];
+    const int dest_bins_after_k  = bins_for_demand(
+        solution.demand_at[dest][k] + extra_dem, cap);
+    delta += (dest_bins_after_k - dest_bins_before_k) * bcost;
+    const int dest_total_after = dest_total_before - dest_bins_before_k + dest_bins_after_k;
+    const bool sat_before = (dest_total_before > max_bins);
+    const bool sat_after  = (dest_total_after  > max_bins);
+    if (!sat_before && sat_after) delta += rho;
+    if (sat_before && !sat_after) delta -= rho;
+  }
+
+  return delta;
+}

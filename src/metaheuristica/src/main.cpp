@@ -188,6 +188,8 @@ int main(int argc, char** argv) {
             << " (" << 100.0*(cost_greedy - result.total_cost)/cost_greedy << "%)\n";
   std::cout << "  Factible: " << (result.n_violations_capacity==0 &&
                                   result.n_violations_coverage==0 ? "SI" : "NO") << "\n";
+  std::cout << "  Violaciones: capacidad=" << result.n_violations_capacity
+            << " cobertura=" << result.n_violations_coverage << "\n";
 
   return 0;
 }
