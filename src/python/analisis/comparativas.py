@@ -304,7 +304,13 @@ def comparar_metodos(sols_por_metodo: dict[str, list],
 def grafico_convergencia(sol_lagrangiana: "Solucion | dict", ax=None):
     """LB/UB vs iteración a partir de ``lb_history``/``ub_history``. Específico de
     la lagrangiana. Si esas claves no están presentes (p. ej. una solución
-    exacta), no inventa nada: dibuja un aviso claro y devuelve el eje."""
+    exacta), no inventa nada: dibuja un aviso claro y devuelve el eje.
+
+    Eje X en escala LOGARÍTMICA: el método del subgradiente converge de forma
+    sublineal (~1/k), así que casi toda la mejora ocurre en las primeras iteraciones
+    y luego hay una cola larga y casi plana. El log expande ese arranque y comprime la
+    cola, que es donde se lee la convergencia. Las iteraciones se numeran desde **1**
+    (no desde 0) precisamente para evitar ``log(0)`` en el primer punto."""
     datos = _datos(sol_lagrangiana)
     lb = datos.get("lb_history")
     ub = datos.get("ub_history")
@@ -319,13 +325,15 @@ def grafico_convergencia(sol_lagrangiana: "Solucion | dict", ax=None):
         ax.axis("off")
         return ax
 
-    iteraciones = range(len(lb))
+    # Numeración 1-based: el eje log no admite la iteración 0 (log(0) = -inf).
+    iteraciones = range(1, len(lb) + 1)
     ax.plot(iteraciones, lb, linewidth=1.5, color="#2980b9", label="LB (cota inferior)")
     ax.plot(iteraciones, ub, linewidth=1.5,
             color=estilo.PALETA_METODOS["lagrangiana"], label="UB (cota superior)")
-    ax.set_xlabel("Iteración")
+    ax.set_xscale("log")
+    ax.set_xlabel("Iteración (escala log)")
     ax.set_ylabel("Coste (€)")
     ax.set_title("Convergencia de la relajación lagrangiana")
     ax.legend()
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, alpha=0.3, which="both")
     return ax
