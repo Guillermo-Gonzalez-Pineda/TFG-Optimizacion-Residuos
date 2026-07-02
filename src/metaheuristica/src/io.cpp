@@ -1,8 +1,8 @@
-// Guardado de soluciones a JSON.
-//
-// Escribe una solución en disco con dos niveles: un RESUMEN compatible con el
-// formato del exacto (solucion_exacta_resumen.json) y un DETALLE completo con
-// la asignación de edificios y los contenedores/demanda de cada punto abierto.
+// Guardado de soluciones a JSON, en el MISMO formato que consume el pipeline de
+// análisis en Python (analisis.carga.cargar_solucion), espejo del exacto y la
+// lagrangiana: z/x/w/y_assign para TODOS los índices, anidado {"j":{"k":v}} con
+// claves string y valores enteros. Así las comparativas entre métodos son
+// uniformes (el consumidor manda: mismo esquema de campos que el exacto).
 
 #include "tabu/io.hpp"
 
@@ -16,98 +16,58 @@
 using json = nlohmann::json;
 
 void save_solution(const SolutionState& solution, const Instance& instance,
-                   const std::string& output_path, double runtime) {
+                   const std::string& output_path, double runtime,
+                   const std::string& mode) {
   const int n_buildings   = instance.n_buildings;
   const int n_candidates  = instance.n_candidates;
   const int n_waste_types = instance.n_waste_types;
 
   json out;
+  out["metodo"]  = "tabu";
+  out["cost"]    = solution.total_cost;
+  out["runtime"] = runtime;
+  out["modo"]    = mode;
 
-  // -------------------------------------------------------------------------
-  // 1) RESUMEN
-  // -------------------------------------------------------------------------
-  out["cost"]         = solution.total_cost;
-  out["runtime"]      = runtime;
-  out["radius"]       = instance.osm_radius;   // trazabilidad: sobre qué instancia se computó
-  out["n_violations_capacity"] = solution.n_violations_capacity;
-  out["n_violations_coverage"] = solution.n_violations_coverage;
-
-  // Puntos abiertos (en orden ascendente) y conteo.
-  json open_points = json::array();
-  int  n_points_open = 0;
+  // z: TODOS los candidatos, plano {"j": 0|1} (= is_open(j)).
+  json z = json::object();
   for (int j = 0; j < n_candidates; ++j) {
-    if (solution.is_open(j)) {
-      open_points.push_back(j);
-      ++n_points_open;
-    }
+    z[std::to_string(j)] = solution.is_open(j) ? 1 : 0;
   }
-  out["n_points_open"] = n_points_open;
+  out["z"] = z;
 
-  // Total de contenedores y desglose por tipo.
-  long long total_bins = 0;
-  std::vector<long long> bins_by_type(n_waste_types, 0);
+  // x (bins) y w (active): TODOS los candidatos y tipos, anidado {"j":{"k":v}}.
+  // Los puntos cerrados van con bins=0 y w=0 (misma cobertura que el exacto).
+  json x = json::object();
+  json w = json::object();
   for (int j = 0; j < n_candidates; ++j) {
+    const std::string jk = std::to_string(j);
+    json xj = json::object();
+    json wj = json::object();
     for (int k = 0; k < n_waste_types; ++k) {
-      const int b = solution.bins[j][k];
-      total_bins        += b;
-      bins_by_type[k]   += b;
+      const std::string kk = std::to_string(k);
+      xj[kk] = solution.bins[j][k];
+      wj[kk] = solution.active[j][k] ? 1 : 0;
     }
+    x[jk] = xj;
+    w[jk] = wj;
   }
-  out["total_bins"] = total_bins;
+  out["x"] = x;
+  out["w"] = w;
 
-  // Claves string por tipo ("0", "1", ...) igual que en el resumen del exacto.
-  json bins_per_type = json::object();
-  for (int k = 0; k < n_waste_types; ++k) {
-    bins_per_type[std::to_string(k)] = bins_by_type[k];
-  }
-  out["bins_per_type"] = bins_per_type;
-
-  out["open_points"] = open_points;
-
-  // -------------------------------------------------------------------------
-  // 2) DETALLE COMPLETO
-  // -------------------------------------------------------------------------
-
-  // Asignación: solo pares (i, k) con asignación != -1.
-  json assignment = json::object();
+  // y_assign: TODOS los edificios y tipos, anidado {"i":{"k":punto}}.
+  // assignment[i][k] ya vale -1 cuando el par (i,k) quedó sin asignar.
+  json y_assign = json::object();
   for (int i = 0; i < n_buildings; ++i) {
-    json per_building = json::object();
+    const std::string ik = std::to_string(i);
+    json yi = json::object();
     for (int k = 0; k < n_waste_types; ++k) {
-      const int point = solution.assignment[i][k];
-      if (point != -1) {
-        per_building[std::to_string(k)] = point;
-      }
+      yi[std::to_string(k)] = solution.assignment[i][k];
     }
-    // Solo añadimos el edificio si tiene alguna asignación.
-    if (!per_building.empty()) {
-      assignment[std::to_string(i)] = per_building;
-    }
+    y_assign[ik] = yi;
   }
-  out["assignment"] = assignment;
+  out["y_assign"] = y_assign;
 
-  // Contenedores y demanda por cada punto abierto, desglosados por tipo.
-  json bins_detail   = json::object();
-  json demand_detail = json::object();
-  for (int j = 0; j < n_candidates; ++j) {
-    if (!solution.is_open(j)) {
-      continue;
-    }
-    const std::string key = std::to_string(j);
-    json per_point_bins   = json::object();
-    json per_point_demand = json::object();
-    for (int k = 0; k < n_waste_types; ++k) {
-      per_point_bins[std::to_string(k)]   = solution.bins[j][k];
-      per_point_demand[std::to_string(k)] = solution.demand_at[j][k];
-    }
-    bins_detail[key]   = per_point_bins;
-    demand_detail[key] = per_point_demand;
-  }
-  out["bins_detail"]   = bins_detail;
-  out["demand_detail"] = demand_detail;
-
-  // -------------------------------------------------------------------------
   // Escritura a disco (creando el directorio de salida si hace falta).
-  // -------------------------------------------------------------------------
   const std::filesystem::path path(output_path);
   if (path.has_parent_path()) {
     std::filesystem::create_directories(path.parent_path());

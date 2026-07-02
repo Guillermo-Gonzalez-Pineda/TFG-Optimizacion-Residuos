@@ -178,9 +178,6 @@ int main(int argc, char** argv) {
     }
   }
 
-  // Cronometramos el cómputo (carga + preproceso + construcción).
-  const auto t0 = std::chrono::steady_clock::now();
-
   Instance instance = load_instance(path);
   preprocess(instance);
 
@@ -197,7 +194,13 @@ int main(int argc, char** argv) {
 
   TabuParams params;   // valores por defecto
   params.mode = mode;
+
+  // Cronometrar SOLO la búsqueda (no la carga/preproceso/construcción ni el I/O):
+  // es la columna de tiempo comparable con el exacto.
+  const auto t_search_0 = std::chrono::steady_clock::now();
   SolutionState result = tabu_search(solution, instance, params);
+  const double runtime = std::chrono::duration<double>(
+      std::chrono::steady_clock::now() - t_search_0).count();
 
   const char* mode_label = (mode == Mode::PerTipo ? "per-tipo" : "entero");
   std::cout << "\n=== Tabu search (modo: " << mode_label << ") ===\n";
@@ -209,6 +212,15 @@ int main(int argc, char** argv) {
                                   result.n_violations_coverage==0 ? "SI" : "NO") << "\n";
   std::cout << "  Violaciones: capacidad=" << result.n_violations_capacity
             << " cobertura=" << result.n_violations_coverage << "\n";
+
+  // Guardar la solución en JSON, en el formato que consume el pipeline Python.
+  // Nombre por modo (sin guion) + radio OSM como etiqueta de tamaño.
+  const char* mode_fs = (mode == Mode::PerTipo ? "pertipo" : "entero");
+  const std::string out_path = "output/metaheuristica/solucion_tabu_"
+      + std::string(mode_fs) + "_"
+      + std::to_string(instance.osm_radius) + "m.json";
+  save_solution(result, instance, out_path, runtime, mode_label);
+  std::cout << "  JSON:   " << out_path << " (runtime " << runtime << "s)\n";
 
   return 0;
 }
