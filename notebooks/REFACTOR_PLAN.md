@@ -259,6 +259,23 @@ eliminar el cruft. Ver mapeo en §5.
   resuelto, así que su cuaderno mostrará una instancia hasta que se corra el barrido). Beneficio
   colateral: mantiene el peso del `.ipynb` con outputs (D7) en el orden de ~2 MB, no ~10 MB.
 
+- **D10 · Estado de optimalidad de Gurobi (`estilo.ESTADO_GUROBI` / `estado_gurobi`).** La
+  calidad de una solución exacta la decide el **`status` CRUDO** de Gurobi, **no el gap
+  redondeado**: un `gap ≈ 0` puede venir de una solución detenida, no demostrada óptima. Mapeo
+  canónico `{2: "óptimo", 9: "time-limit", 11: "interrumpido"}`; `estado_gurobi(status)` devuelve
+  la etiqueta o el código crudo (`"status <n>"`) si no está en el mapa — **nunca asume óptimo**
+  (p. ej. `13`=SUBOPTIMAL → `"status 13"`). Lectura semántica: **9 = censura por el límite de
+  tiempo** (la meseta de 4 h) frente a **11 = interrupción externa antes del límite** (dos cosas
+  distintas). Verificado por diagnóstico de solo lectura: status `2` en 250–650 m, status `9` en
+  700–1000 m (clavados en 14400 s), status `11` solo en 1500 m (8178 s < 14400 s → interrupción
+  real, no time-limit). El mapeo **y** el marcador visual `MARCADOR_ESTADO = {"time-limit": "s",
+  "interrumpido": "^"}` viven en `estilo.py` como **única fuente**; el módulo **agnóstico**
+  `comparativas` NO los conoce: `grafico_escalabilidad(resaltar=[grupos])` recibe del cuaderno la
+  lista de grupos `{indices, etiqueta, marcador}` y solo dibuja los índices dados (la
+  clasificación por `status` la hace el cuaderno del exacto, no la librería). ⚠️ El 1500 m es
+  **dato volátil** (re-ejecución pendiente de `git pull`): el cuaderno lo lee dinámicamente de la
+  solución, no lo clava.
+
 ---
 
 ## §4 · Riesgos y validaciones
