@@ -59,3 +59,10 @@ Thumbs.db
 .env
 .env.local
 npm-debug.log*
+
+# ============================================================
+# C++ METAHEURÍSTICA — binarios y build (se recompilan)
+# ============================================================
+src/metaheuristica/prueba
+src/metaheuristica/prueba_debug
+build/
