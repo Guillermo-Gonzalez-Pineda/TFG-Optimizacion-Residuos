@@ -297,3 +297,14 @@ void apply_swap(SolutionState& solution, const Instance& instance,
   apply_close(solution, instance, j_out);
   apply_open(solution, instance, j_in);
 }
+
+
+void apply_swap_type(SolutionState& solution, const Instance& instance,
+                     int j_out, int j_in, int k) {
+  // Desactivar primero (reubica los edificios de (j_out,k) SIN j_in todavía) y
+  // luego activar j_in (que atrae los que le queden más cerca, incluidos esos
+  // huérfanos). El estado final es nearest-active sobre (activos − j_out + j_in),
+  // idéntico al swap atómico; cada primitiva aplica su flip z[j] en su extremo.
+  apply_deactivate(solution, instance, j_out, k);
+  apply_activate(solution, instance, j_in, k);
+}

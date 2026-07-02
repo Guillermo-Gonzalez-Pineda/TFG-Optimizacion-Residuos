@@ -69,3 +69,18 @@ double delta_activate(const SolutionState& solution, const Instance& instance,
  */
 double delta_deactivate(const SolutionState& solution, const Instance& instance,
                         int j, int k, double rho);
+
+
+/**
+ * Calcula el CAMBIO de coste de un SWAP POR TIPO: mover el tipo `k` de `j_out` a
+ * `j_in` (desactivar (j_out,k) + activar (j_in,k)) en un solo movimiento, SIN
+ * mutar el estado. Precondición: active[j_out][k]=true, active[j_in][k]=false.
+ *
+ * Predice el DOBLE flip z[j]: resta C_jout si k es el único tipo activo de j_out
+ * (se cierra) y suma C_jin si j_in estaba cerrado (se abre). Reasigna los edificios
+ * de (j_out,k) tratando j_in como activo, y contabiliza el rebalanceo de bins.
+ * Igual que delta_swap (entero) evita el doble conteo (Bug 1): los edificios ya en
+ * j_out se cuentan una sola vez. Delta negativo = mejora.
+ */
+double delta_swap_type(const SolutionState& solution, const Instance& instance,
+                       int j_out, int j_in, int k, double rho);

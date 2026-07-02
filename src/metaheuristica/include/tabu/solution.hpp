@@ -133,6 +133,18 @@ void apply_swap(SolutionState& solution, const Instance& instance,
 
 
 /**
+ * SWAP POR TIPO: mueve el tipo `k` de `j_out` a `j_in`. Se compone de
+ * apply_deactivate(j_out,k) seguido de apply_activate(j_in,k): el primero reubica
+ * los edificios de (j_out,k) (aún sin j_in activo) y el segundo activa j_in y atrae
+ * los que le quedan más cerca. El resultado es idéntico al swap atómico porque la
+ * asignación final es "nearest-active" sobre el conjunto (activos − j_out + j_in),
+ * y el doble flip z[j] lo aplican las dos primitivas en sus respectivos extremos.
+ */
+void apply_swap_type(SolutionState& solution, const Instance& instance,
+                     int j_out, int j_in, int k);
+
+
+/**
  * Calcula desde cero el coste total de la solución y su número de violaciones,
  * y los guarda en solution.total_cost y solution.n_violations.
  *

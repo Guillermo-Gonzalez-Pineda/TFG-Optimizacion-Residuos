@@ -302,6 +302,36 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
       }
     }
 
+    // --- Vecinos SWAP POR TIPO, ACOTADOS por cercanía: mover el tipo k de un
+    //     punto activo j_out a un j_in cercano (que no sirva k). Los j_in candidatos
+    //     son la UNIÓN de valid_candidates de los edificios de (j_out,k) — el conjunto
+    //     de puntos que pueden servir a alguno de ellos dentro de su radio r_k. ---
+    for (int j_out = 0; j_out < n_candidates; ++j_out) {
+      for (int k = 0; k < instance.n_waste_types; ++k) {
+        if (!solution.active[j_out][k]) continue;   // solo tipos que j_out sirve
+
+        // Reunir los j_in cercanos que NO sirven ya el tipo k (dedup con set).
+        std::set<int> nearby;
+        for (int i : solution.buildings_at[j_out][k]) {
+          for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
+            if (vc.j != j_out && !solution.active[vc.j][k]) nearby.insert(vc.j);
+          }
+        }
+
+        for (int j_in : nearby) {
+          double d = delta_swap_type(solution, instance, j_out, j_in, k, current_rho);
+          // Tabú del swap: veta si cualquiera de sus dos mitades está vetada.
+          bool tabu_move = tabu.is_deactivate_forbidden(j_out, k, iter) ||
+                           tabu.is_activate_forbidden(j_in, k, iter);
+          bool aspires = (solution.total_cost + d < best_global.total_cost);
+          if ((!tabu_move || aspires) && d < best_delta) {
+            best_delta = d; best_point = j_out; best_second = j_in;
+            best_third = k; best_move_type = 5;
+          }
+        }
+      }
+    }
+
     // Sin movimiento permitido: terminar.
     if (best_move_type == -1) break;
 
@@ -329,6 +359,12 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
       // Desactivar (j,k) → vetar REACTIVAR ese tipo en ese punto.
       apply_deactivate(solution, instance, best_point, best_second);
       tabu.mark_deactivated(best_point, best_second, iter, params.tabu_tenure);
+    } else {  // best_move_type == 5: swap por tipo (j_out=best_point, j_in=best_second, k=best_third)
+      // Mover k de j_out a j_in → vetar traerlo de vuelta (reactivar en j_out) y
+      // vetar quitarlo de j_in (desactivar allí): impide el swap inverso inmediato.
+      apply_swap_type(solution, instance, best_point, best_second, best_third);
+      tabu.mark_deactivated(best_point,  best_third, iter, params.tabu_tenure);  // veta reactivar (j_out,k)
+      tabu.mark_activated(best_second, best_third, iter, params.tabu_tenure);    // veta desactivar (j_in,k)
     }
 
     // Recalcular el coste de la nueva solución actual.

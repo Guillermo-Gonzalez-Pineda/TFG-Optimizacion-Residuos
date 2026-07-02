@@ -388,3 +388,84 @@ double delta_deactivate(const SolutionState& solution, const Instance& instance,
 
   return delta;
 }
+
+
+double delta_swap_type(const SolutionState& solution, const Instance& instance,
+                       int j_out, int j_in, int k, double rho) {
+  const int    n_types  = instance.n_waste_types;
+  const int    max_bins = instance.params.max_bins;
+  const double cap      = instance.params.bin_capacity[k];
+  const double bcost    = instance.params.bin_cost[k];
+
+  double delta = 0.0;
+
+  // --- Doble flip z[j], predicho sin mutar ---
+  bool jout_closes = true;                          // j_out cierra si k es su único tipo activo
+  for (int t = 0; t < n_types; ++t) {
+    if (t != k && solution.active[j_out][t]) { jout_closes = false; break; }
+  }
+  if (jout_closes) delta -= instance.candidates[j_out].opening_cost;
+  if (!solution.is_open(j_in)) delta += instance.candidates[j_in].opening_cost;  // j_in abre si estaba cerrado
+
+  // Cambio de demanda de tipo k por punto DESTINO (j_out se trata aparte, ver 4).
+  std::unordered_map<int, double> net;
+  int new_coverage = 0;
+
+  // --- 1) Reubicar los edificios de (j_out,k): nearest-active en el NUEVO conjunto
+  //        (activos de tipo k, quitando j_out y tratando j_in como activo). ---
+  for (int i : solution.buildings_at[j_out][k]) {
+    int dest = -1;
+    for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
+      if (vc.j == j_out) continue;
+      if (vc.j == j_in || solution.active[vc.j][k]) { dest = vc.j; break; }
+    }
+    if (dest == -1) ++new_coverage;
+    else net[dest] += instance.demand[i][k];
+  }
+
+  // --- 2) j_in atrae los edificios de tipo k que le quedan más cerca y que NO
+  //        estaban en j_out (esos ya se reubicaron en el paso 1: Bug 1). ---
+  for (const BuildingType& bt : instance.buildings_of[j_in]) {
+    if (bt.k != k) continue;
+    const int i = bt.i;
+    if (solution.assignment[i][k] == j_out) continue;   // evitar doble conteo
+    if (bt.distance < solution.assigned_dist[i][k]) {
+      net[j_in] += instance.demand[i][k];
+      const int old = solution.assignment[i][k];
+      if (old == -1) --new_coverage;                    // estaba descubierto → cubierto
+      else net[old] -= instance.demand[i][k];           // old != j_out (garantizado por el skip)
+    }
+  }
+
+  delta += rho * new_coverage;
+
+  // --- 3) Traducir el cambio de demanda de tipo k a cambio de bins/saturación en
+  //        los destinos (net). j_in incluido; su base de tipo k es 0 (no servía k). ---
+  for (const auto& [point, change] : net) {
+    int total_before = 0;
+    for (int t = 0; t < n_types; ++t) total_before += solution.bins[point][t];
+    const int bins_before_k = solution.bins[point][k];
+    const int bins_after_k  = bins_for_demand(solution.demand_at[point][k] + change, cap);
+    delta += (bins_after_k - bins_before_k) * bcost;
+    const int total_after = total_before - bins_before_k + bins_after_k;
+    const bool sat_before = (total_before > max_bins);
+    const bool sat_after  = (total_after  > max_bins);
+    if (!sat_before && sat_after) delta += rho;
+    if (sat_before && !sat_after) delta -= rho;
+  }
+
+  // --- 4) j_out pierde TODOS sus bins del tipo k (su demanda de k se va). ---
+  int jout_total_before = 0;
+  for (int t = 0; t < n_types; ++t) jout_total_before += solution.bins[j_out][t];
+  const int jout_bins_k = solution.bins[j_out][k];
+  delta -= jout_bins_k * bcost;
+  const int jout_total_after = jout_total_before - jout_bins_k;   // tipo k → 0
+  {
+    const bool sat_before = (jout_total_before > max_bins);
+    const bool sat_after  = (jout_total_after  > max_bins);
+    if (sat_before && !sat_after) delta -= rho;
+    if (!sat_before && sat_after) delta += rho;
+  }
+
+  return delta;
+}
