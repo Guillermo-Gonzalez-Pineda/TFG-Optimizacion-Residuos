@@ -87,6 +87,11 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
   // Cronómetro: tiempo transcurrido desde el inicio de la búsqueda.
   const auto t_start = std::chrono::steady_clock::now();
 
+  // Etiqueta del modo activo, para no confundir corridas.
+  const char* mode_label = (params.mode == Mode::PerTipo ? "per-tipo" : "entero");
+  std::cout << "== tabu_search | modo: " << mode_label
+            << " | max_iters: " << params.max_iters << " ==\n";
+
   for (int iter = 0; iter < params.max_iters; ++iter) {
     // Mejor movimiento permitido de esta iteración.
     double best_delta = std::numeric_limits<double>::infinity();
@@ -119,56 +124,61 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
       }
     }
 
-    // --- Vecinos POR TIPO: activar / desactivar un solo (j,k) ---
-    //     Esto ROMPE el régimen colapsado: un punto puede quedar con unos tipos
-    //     activos y otros no. El veto tabú aquí es por (j,k), no por punto.
-    for (int j = 0; j < n_candidates; ++j) {
-      for (int k = 0; k < instance.n_waste_types; ++k) {
-        if (solution.active[j][k]) {
-          // DESACTIVAR (j,k)
-          double d = delta_deactivate(solution, instance, j, k, current_rho);
-          bool tabu_move = tabu.is_deactivate_forbidden(j, k, iter);
-          bool aspires = (solution.total_cost + d < best_global.total_cost);
-          if ((!tabu_move || aspires) && d < best_delta) {
-            best_delta = d; best_point = j; best_second = k; best_move_type = 4;
-          }
-        } else {
-          // ACTIVAR (j,k)  (j puede estar cerrado, o abierto con otros tipos)
-          double d = delta_activate(solution, instance, j, k, current_rho);
-          bool tabu_move = tabu.is_activate_forbidden(j, k, iter);
-          bool aspires = (solution.total_cost + d < best_global.total_cost);
-          if ((!tabu_move || aspires) && d < best_delta) {
-            best_delta = d; best_point = j; best_second = k; best_move_type = 3;
+    // Familias POR TIPO (activate/deactivate) y SWAP POR TIPO: SOLO en modo
+    // per-tipo. En modo entero no se enumeran → la búsqueda solo abre/cierra
+    // puntos completos y permanece en régimen colapsado (= modelo open[j]).
+    if (params.mode == Mode::PerTipo) {
+      // --- Vecinos POR TIPO: activar / desactivar un solo (j,k) ---
+      //     Esto ROMPE el régimen colapsado: un punto puede quedar con unos tipos
+      //     activos y otros no. El veto tabú aquí es por (j,k), no por punto.
+      for (int j = 0; j < n_candidates; ++j) {
+        for (int k = 0; k < instance.n_waste_types; ++k) {
+          if (solution.active[j][k]) {
+            // DESACTIVAR (j,k)
+            double d = delta_deactivate(solution, instance, j, k, current_rho);
+            bool tabu_move = tabu.is_deactivate_forbidden(j, k, iter);
+            bool aspires = (solution.total_cost + d < best_global.total_cost);
+            if ((!tabu_move || aspires) && d < best_delta) {
+              best_delta = d; best_point = j; best_second = k; best_move_type = 4;
+            }
+          } else {
+            // ACTIVAR (j,k)  (j puede estar cerrado, o abierto con otros tipos)
+            double d = delta_activate(solution, instance, j, k, current_rho);
+            bool tabu_move = tabu.is_activate_forbidden(j, k, iter);
+            bool aspires = (solution.total_cost + d < best_global.total_cost);
+            if ((!tabu_move || aspires) && d < best_delta) {
+              best_delta = d; best_point = j; best_second = k; best_move_type = 3;
+            }
           }
         }
       }
-    }
 
-    // --- Vecinos SWAP POR TIPO, ACOTADOS por cercanía: mover el tipo k de un
-    //     punto activo j_out a un j_in cercano (que no sirva k). Los j_in candidatos
-    //     son la UNIÓN de valid_candidates de los edificios de (j_out,k) — el conjunto
-    //     de puntos que pueden servir a alguno de ellos dentro de su radio r_k. ---
-    for (int j_out = 0; j_out < n_candidates; ++j_out) {
-      for (int k = 0; k < instance.n_waste_types; ++k) {
-        if (!solution.active[j_out][k]) continue;   // solo tipos que j_out sirve
+      // --- Vecinos SWAP POR TIPO, ACOTADOS por cercanía: mover el tipo k de un
+      //     punto activo j_out a un j_in cercano (que no sirva k). Los j_in candidatos
+      //     son la UNIÓN de valid_candidates de los edificios de (j_out,k) — el conjunto
+      //     de puntos que pueden servir a alguno de ellos dentro de su radio r_k. ---
+      for (int j_out = 0; j_out < n_candidates; ++j_out) {
+        for (int k = 0; k < instance.n_waste_types; ++k) {
+          if (!solution.active[j_out][k]) continue;   // solo tipos que j_out sirve
 
-        // Reunir los j_in cercanos que NO sirven ya el tipo k (dedup con set).
-        std::set<int> nearby;
-        for (int i : solution.buildings_at[j_out][k]) {
-          for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
-            if (vc.j != j_out && !solution.active[vc.j][k]) nearby.insert(vc.j);
+          // Reunir los j_in cercanos que NO sirven ya el tipo k (dedup con set).
+          std::set<int> nearby;
+          for (int i : solution.buildings_at[j_out][k]) {
+            for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
+              if (vc.j != j_out && !solution.active[vc.j][k]) nearby.insert(vc.j);
+            }
           }
-        }
 
-        for (int j_in : nearby) {
-          double d = delta_swap_type(solution, instance, j_out, j_in, k, current_rho);
-          // Tabú del swap: veta si cualquiera de sus dos mitades está vetada.
-          bool tabu_move = tabu.is_deactivate_forbidden(j_out, k, iter) ||
-                           tabu.is_activate_forbidden(j_in, k, iter);
-          bool aspires = (solution.total_cost + d < best_global.total_cost);
-          if ((!tabu_move || aspires) && d < best_delta) {
-            best_delta = d; best_point = j_out; best_second = j_in;
-            best_third = k; best_move_type = 5;
+          for (int j_in : nearby) {
+            double d = delta_swap_type(solution, instance, j_out, j_in, k, current_rho);
+            // Tabú del swap: veta si cualquiera de sus dos mitades está vetada.
+            bool tabu_move = tabu.is_deactivate_forbidden(j_out, k, iter) ||
+                             tabu.is_activate_forbidden(j_in, k, iter);
+            bool aspires = (solution.total_cost + d < best_global.total_cost);
+            if ((!tabu_move || aspires) && d < best_delta) {
+              best_delta = d; best_point = j_out; best_second = j_in;
+              best_third = k; best_move_type = 5;
+            }
           }
         }
       }
@@ -214,6 +224,9 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
     ORACLE_VERIFY(solution, instance, current_rho, iter, best_move_type,
                   best_point, best_second, best_third,
                   oracle_cost_before, oracle_predicted_delta);
+
+    // Invariante de régimen: en modo entero, ningún punto puede quedar a medias.
+    ORACLE_ASSERT_INTEGER(solution, instance, iter, params.mode == Mode::Entero);
 
     // Actualizar récord global (para aspiración).
     if (solution.total_cost < best_global.total_cost) {

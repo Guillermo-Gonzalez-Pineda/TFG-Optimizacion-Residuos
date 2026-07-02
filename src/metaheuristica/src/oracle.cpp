@@ -154,4 +154,30 @@ void oracle_verify(const SolutionState& sol, const Instance& instance,
     std::abort();
   }
 }
+
+
+// Invariante de COLAPSO del modo entero: todo punto j debe ser uniforme en sus
+// tipos (todos activos o todos inactivos). Un punto a medias en modo entero
+// significa que la búsqueda se salió del régimen colapsado (bug del filtro de
+// vecindario) → aborta. El oráculo normal NO lo detecta: un punto a medias es
+// consistente consigo mismo; esto verifica CONFORMIDAD de régimen, no consistencia.
+void oracle_assert_integer_regime(const SolutionState& sol, const Instance& instance,
+                                  int iter, bool active) {
+  if (!active) return;   // modo per-tipo: los puntos a medias son legítimos
+  for (int j = 0; j < instance.n_candidates; ++j) {
+    const bool ref = sol.active[j][0];
+    for (int k = 1; k < instance.n_waste_types; ++k) {
+      if (sol.active[j][k] != ref) {
+        std::fprintf(stderr,
+          "\n[ORACLE] FALLO (régimen) punto a medias en modo ENTERO | iter %d\n"
+          "  punto %d: tipo 0 %s pero tipo %d %s (deberían ser uniformes)\n"
+          "[ORACLE] Régimen no colapsado: abortando en iter %d.\n",
+          iter, j, ref ? "activo" : "inactivo",
+          k, sol.active[j][k] ? "activo" : "inactivo", iter);
+        std::fflush(stderr);
+        std::abort();
+      }
+    }
+  }
+}
 #endif  // ORACLE_CHECK

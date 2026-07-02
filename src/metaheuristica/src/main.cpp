@@ -156,10 +156,27 @@ static int run_primitive_tests(const Instance& instance) {
 #endif  // PRIMITIVE_TEST
 
 int main(int argc, char** argv) {
-  // Ruta a la instancia de 500m (se puede sobrescribir por argumento).
-  const std::string path = (argc > 1)
-      ? argv[1]
-      : "../../data/processed/instancia_laguna_500m.json";
+  // Args: ruta de instancia (posicional, opcional) y --modo=per-tipo|entero.
+  std::string path = "../../data/processed/instancia_laguna_500m.json";
+  Mode mode = Mode::PerTipo;   // por defecto
+  for (int a = 1; a < argc; ++a) {
+    const std::string arg = argv[a];
+    if (arg.starts_with("--modo=")) {
+      const std::string val = arg.substr(7);
+      if      (val == "per-tipo") mode = Mode::PerTipo;
+      else if (val == "entero")   mode = Mode::Entero;
+      else {
+        std::cerr << "modo desconocido: '" << val
+                  << "' (use --modo=per-tipo | --modo=entero)\n";
+        return 1;
+      }
+    } else if (arg.starts_with("--")) {
+      std::cerr << "flag desconocido: '" << arg << "'\n";
+      return 1;
+    } else {
+      path = arg;   // argumento posicional = ruta de instancia
+    }
+  }
 
   // Cronometramos el cómputo (carga + preproceso + construcción).
   const auto t0 = std::chrono::steady_clock::now();
@@ -179,9 +196,11 @@ int main(int argc, char** argv) {
   double cost_greedy = solution.total_cost;
 
   TabuParams params;   // valores por defecto
+  params.mode = mode;
   SolutionState result = tabu_search(solution, instance, params);
 
-  std::cout << "\n=== Tabu search ===\n";
+  const char* mode_label = (mode == Mode::PerTipo ? "per-tipo" : "entero");
+  std::cout << "\n=== Tabu search (modo: " << mode_label << ") ===\n";
   std::cout << "  Coste greedy:  " << cost_greedy << "\n";
   std::cout << "  Coste tabu:    " << result.total_cost << "\n";
   std::cout << "  Mejora:        " << (cost_greedy - result.total_cost)

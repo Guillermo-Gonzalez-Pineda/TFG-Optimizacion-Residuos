@@ -5,11 +5,21 @@
 #include "tabu/solution.hpp"
 #include "tabu/instancia.hpp"
 
+/**
+ * Modo de la búsqueda: qué familias de movimientos se enumeran.
+ *  - PerTipo: enteros (open/close) + per-tipo (activate/deactivate) + swap por tipo.
+ *  - Entero : SOLO enteros (open/close). El vecindario no puede crear puntos a
+ *             medias, así que la búsqueda queda en régimen colapsado y reproduce
+ *             el modelo open[j] original como caso particular del per-tipo.
+ */
+enum class Mode { PerTipo, Entero };
+
 /** Parámetros de la búsqueda tabú. Único lugar donde vive rho. */
 struct TabuParams {
   double rho = 100000.0;
   int tabu_tenure = 20;
   int max_iters = 10000;
+  Mode mode = Mode::PerTipo;   // por defecto: las tres familias (comportamiento actual)
 };
 
 /**
