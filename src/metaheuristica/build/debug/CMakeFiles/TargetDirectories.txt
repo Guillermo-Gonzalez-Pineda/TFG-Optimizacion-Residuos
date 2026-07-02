@@ -1,0 +1,3 @@
+/home/guillermogonzalez/Privado/TFG-Optimizacion-Residuos/src/metaheuristica/build/debug/CMakeFiles/metaheuristica.dir
+/home/guillermogonzalez/Privado/TFG-Optimizacion-Residuos/src/metaheuristica/build/debug/CMakeFiles/edit_cache.dir
+/home/guillermogonzalez/Privado/TFG-Optimizacion-Residuos/src/metaheuristica/build/debug/CMakeFiles/rebuild_cache.dir
