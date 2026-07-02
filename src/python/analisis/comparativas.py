@@ -25,6 +25,7 @@ from typing import Any, Sequence
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.ticker import PercentFormatter
 
 from . import estilo
 from . import metricas
@@ -182,9 +183,29 @@ def tabla_matplotlib(df: pd.DataFrame, titulo: str | None = None, ax=None):
 
 def grafico_escalabilidad(sols: Sequence[Solucion],
                           columnas: Sequence[str] = ("coste", "tiempo", "n_puntos"),
-                          ax=None):
+                          ax=None,
+                          resaltar: "list[dict] | None" = None):
     """Un panel por columna (eje X = tam), una línea por método. Versión genérica
-    de 02c8. Devuelve el/los ejes."""
+    de 02c8. Devuelve el/los ejes.
+
+    Columnas dibujables: cualquiera de ``tabla_resumen`` (``coste``, ``tiempo``,
+    ``gap``, ``n_puntos``, ``n_bins``). El panel de ``tiempo`` usa escala LOGARÍTMICA
+    (crece varios órdenes de magnitud); el de ``gap`` usa escala LINEAL con el eje Y en
+    porcentaje.
+
+    ``resaltar`` (opcional): LISTA de grupos, cada uno
+    ``{"indices": [...], "etiqueta": str, "marcador": str}``. Cada grupo se dibuja en el
+    panel de ``tiempo`` con su ``marcador`` sobre los puntos indicados —por su POSICIÓN
+    en ``sols``— y una entrada de leyenda con su ``etiqueta``. Es AGNÓSTICO: esta función
+    solo dibuja los grupos que recibe; NO importa ``estado_gurobi``, NO sabe de
+    ``status`` ni de Gurobi. Motivación (en el exacto): el tiempo se satura en el límite
+    de 4 h, así que esa meseta es CENSURA (time-limit), no convergencia; marcarla evita
+    leerla como estabilización, y el panel de ``gap`` revela el error real que hay
+    detrás. La clasificación de cada grupo (time-limit vs interrumpido) la hace el
+    CUADERNO (Tarea B, vía ``estilo.estado_gurobi``/``MARCADOR_ESTADO``), no la librería.
+
+    RETROCOMPATIBLE: una llamada SIN ``gap`` en ``columnas`` y SIN ``resaltar`` produce
+    exactamente el gráfico de 3 paneles anterior (lo llaman así 03/04/05)."""
     df = tabla_resumen(sols)
 
     if ax is None:
@@ -197,7 +218,7 @@ def grafico_escalabilidad(sols: Sequence[Solucion],
 
     etiquetas = {"coste": "Coste (€)", "tiempo": "Tiempo (s)",
                  "n_puntos": "Puntos abiertos", "n_bins": "Contenedores",
-                 "gap": "Gap"}
+                 "gap": "Gap (%)"}
 
     for eje, col in zip(ejes, columnas):
         for metodo, grupo in df.groupby("metodo"):
@@ -212,7 +233,27 @@ def grafico_escalabilidad(sols: Sequence[Solucion],
         eje.grid(True, alpha=0.3)
         if col == "tiempo":
             eje.set_yscale("log")     # el tiempo crece varios órdenes de magnitud
-        if df["metodo"].nunique() > 1:
+        if col == "gap":
+            # Escala LINEAL (no log) y eje Y en %: el gap es la métrica que revela el
+            # error real detrás de la meseta del time-limit.
+            eje.yaxis.set_major_formatter(PercentFormatter(xmax=1))
+
+        # Leyenda: por defecto solo si hay varios métodos (comportamiento anterior);
+        # el resaltado del panel de tiempo la fuerza para explicar los marcadores.
+        mostrar_leyenda = df["metodo"].nunique() > 1
+        if resaltar and col == "tiempo":
+            for grupo in resaltar:
+                indices = grupo.get("indices", [])
+                etiqueta = grupo.get("etiqueta", "resaltado")
+                marcador = grupo.get("marcador", "s")
+                xs = [sols[i].tam for i in indices]
+                ys = [sols[i].datos.get("runtime") for i in indices]
+                if xs:
+                    eje.scatter(xs, ys, marker=marcador, s=140, facecolors="none",
+                                edgecolors="#c0392b", linewidths=1.8, zorder=6,
+                                label=etiqueta)
+                    mostrar_leyenda = True
+        if mostrar_leyenda:
             eje.legend()
 
     return ejes
