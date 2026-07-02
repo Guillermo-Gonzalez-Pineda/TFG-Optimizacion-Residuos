@@ -124,10 +124,40 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
       }
     }
 
-    // Familias POR TIPO (activate/deactivate) y SWAP POR TIPO: SOLO en modo
-    // per-tipo. En modo entero no se enumeran → la búsqueda solo abre/cierra
-    // puntos completos y permanece en régimen colapsado (= modelo open[j]).
-    if (params.mode == Mode::PerTipo) {
+    // Familia de SWAP según el modo (SIMETRÍA): el swap ENTERO solo en modo
+    // entero; las familias per-tipo (activate/deactivate + swap por tipo) solo en
+    // per-tipo. Los enteros open/close ya se enumeraron arriba en ambos modos.
+    if (params.mode == Mode::Entero) {
+      // --- SWAP ENTERO, ACOTADO por cercanía: réplica del vecindario de swap del
+      //     modelo open[j] original (rama main). Por cada punto abierto j_out,
+      //     intercambiar (cerrar entero + abrir entero, atómico) por candidatos
+      //     CERRADOS cercanos (los valid_candidates de los edificios que sirve). ---
+      for (int j_out = 0; j_out < n_candidates; ++j_out) {
+        if (!solution.is_open(j_out)) continue;
+
+        // Candidatos cerrados cercanos (dedup con set → j_in en orden ascendente,
+        // igual que en main). Unión de valid_candidates de los edificios de j_out.
+        std::set<int> nearby_closed;
+        for (int k = 0; k < instance.n_waste_types; ++k) {
+          for (int i : solution.buildings_at[j_out][k]) {
+            for (const ValidCandidate& vc : instance.valid_candidates[i][k]) {
+              if (!solution.is_open(vc.j) && vc.j != j_out) nearby_closed.insert(vc.j);
+            }
+          }
+        }
+
+        for (int j_in : nearby_closed) {
+          double d = delta_swap(solution, instance, j_out, j_in, current_rho);
+          // Tabú del swap entero: veta si cerrar j_out o abrir j_in está vetado.
+          bool tabu_move = tabu.is_close_forbidden(j_out, iter) ||
+                           tabu.is_open_forbidden(j_in, iter);
+          bool aspires = (solution.total_cost + d < best_global.total_cost);
+          if ((!tabu_move || aspires) && d < best_delta) {
+            best_delta = d; best_point = j_out; best_second = j_in; best_move_type = 2;
+          }
+        }
+      }
+    } else {  // Mode::PerTipo
       // --- Vecinos POR TIPO: activar / desactivar un solo (j,k) ---
       //     Esto ROMPE el régimen colapsado: un punto puede quedar con unos tipos
       //     activos y otros no. El veto tabú aquí es por (j,k), no por punto.
@@ -201,6 +231,12 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
       // Abrir best_point (entero) → vetar CERRARLO.
       apply_open(solution, instance, best_point);
       tabu.mark_opened(best_point, iter, params.tabu_tenure);
+    } else if (best_move_type == 2) {
+      // Swap entero: cerrar best_point (j_out) y abrir best_second (j_in), atómico.
+      // Vetar reabrir j_out y cerrar j_in (impide el swap inverso inmediato).
+      apply_swap(solution, instance, best_point, best_second);
+      tabu.mark_closed(best_point,  iter, params.tabu_tenure);
+      tabu.mark_opened(best_second, iter, params.tabu_tenure);
     } else if (best_move_type == 3) {
       // Activar (j,k) → vetar DESACTIVAR ese tipo en ese punto.
       apply_activate(solution, instance, best_point, best_second);
@@ -267,11 +303,13 @@ SolutionState tabu_search(SolutionState solution, const Instance& instance,
               std::chrono::steady_clock::now() - t_start).count();
       const char* move = (best_move_type == 0 ? "CERRAR" :
                           best_move_type == 1 ? "ABRIR " :
+                          best_move_type == 2 ? "SWAP  " :
                           best_move_type == 3 ? "ACTIV " :
                           best_move_type == 4 ? "DESACT" : "SWAPT ");
       std::cout << "  iter " << iter << " | " << move << " " << best_point;
+      if (best_move_type == 2 || best_move_type == 5) std::cout << "<->" << best_second;
       if (best_move_type == 3 || best_move_type == 4) std::cout << " k=" << best_second;
-      if (best_move_type == 5) std::cout << "<->" << best_second << " k=" << best_third;
+      if (best_move_type == 5) std::cout << " k=" << best_third;
       std::cout << " | delta: " << best_delta
                 << " | coste: " << solution.total_cost
                 << " | mejor fact: " << (have_feasible ? best_feasible.total_cost : -1)
