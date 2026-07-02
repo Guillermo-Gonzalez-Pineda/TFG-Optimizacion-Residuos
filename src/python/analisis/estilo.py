@@ -34,7 +34,38 @@ PALETA_METODOS = {
     "metaheuristica": "#8e44ad",
 }
 
+# Muestra de tamaños para VISUALES POR INSTANCIA (mapas de solución, convergencia
+# individual): única fuente de verdad de la política de muestra del plan (D9).
+# Los cuadernos por método pintan un mapa por tamaño solo para RADIOS_MUESTRA ∩
+# {tamaños con artefacto en disco}; las TABLAS y los GRÁFICOS AGREGADOS
+# (escalabilidad) siguen usando TODOS los tamaños, no esta muestra.
+# Criterio: 500 (mínimo legible) · 800/1000 (interior) · 1500 (máximo de memoria).
+RADIOS_MUESTRA = [500, 800, 1000, 1500]
+
+# Estado de OPTIMALIDAD de Gurobi por código de ``status`` (plan D10). Solo se mapean
+# los estados que el análisis necesita distinguir. La ETIQUETA la decide el ``status``
+# CRUDO (entero de ``Model.Status``), NUNCA el gap redondeado (un gap ≈ 0 puede venir de
+# una solución NO demostrada óptima). estilo.py no importa gurobipy: solo mapea enteros.
+#   2  → óptimo        (OPTIMAL, óptimo demostrado)
+#   9  → time-limit    (TIME_LIMIT, censura por límite de tiempo: la meseta de 4 h)
+#   11 → interrumpido  (INTERRUPTED, interrupción externa ANTES del límite)
+# Este mapeo es la ÚNICA fuente; el módulo agnóstico ``comparativas`` NO lo conoce.
+ESTADO_GUROBI = {2: "óptimo", 9: "time-limit", 11: "interrumpido"}
+
+# Aspecto del marcador por estado en los gráficos (única fuente del estilo visual): el
+# cuaderno pasa estos marcadores a ``comparativas.grafico_escalabilidad(resaltar=...)``.
+MARCADOR_ESTADO = {"time-limit": "s", "interrumpido": "^"}
+
 
 def nombre_tipo(k: int) -> str:
     """Etiqueta del tipo de residuo ``k`` (con respaldo genérico si no existe)."""
     return TIPOS_RESIDUO.get(k, f"tipo {k}")
+
+
+def estado_gurobi(status: int) -> str:
+    """Etiqueta de optimalidad del código de ``status`` de Gurobi (plan D10).
+
+    Devuelve la etiqueta mapeada (``"óptimo"`` / ``"time-limit"`` / ``"interrumpido"``)
+    o, si el código no está en ``ESTADO_GUROBI``, el código crudo (``"status <n>"``).
+    NUNCA asume óptimo para un código desconocido (p. ej. 13 = SUBOPTIMAL)."""
+    return ESTADO_GUROBI.get(status, f"status {status}")

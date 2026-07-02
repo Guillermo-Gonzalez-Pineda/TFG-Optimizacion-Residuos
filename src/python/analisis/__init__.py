@@ -52,7 +52,15 @@ from .metricas import (
 )
 # `estilo` son constantes puras (sin matplotlib): es seguro re-exportarlo.
 from . import estilo
-from .estilo import TIPOS_RESIDUO, PALETA_METODOS, nombre_tipo
+from .estilo import (
+    TIPOS_RESIDUO,
+    PALETA_METODOS,
+    RADIOS_MUESTRA,
+    ESTADO_GUROBI,
+    MARCADOR_ESTADO,
+    nombre_tipo,
+    estado_gurobi,
+)
 
 # NOTA: `comparativas` NO se importa aquí a propósito — arrastraría matplotlib/pandas
 # a cualquier `import analisis`. Úsese bajo demanda: `from analisis.comparativas import ...`.
@@ -99,5 +107,9 @@ __all__ = [
     "estilo",
     "TIPOS_RESIDUO",
     "PALETA_METODOS",
+    "RADIOS_MUESTRA",
+    "ESTADO_GUROBI",
+    "MARCADOR_ESTADO",
     "nombre_tipo",
+    "estado_gurobi",
 ]
