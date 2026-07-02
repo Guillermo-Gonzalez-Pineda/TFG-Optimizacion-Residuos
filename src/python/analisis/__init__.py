@@ -50,6 +50,11 @@ from .metricas import (
     candidatos_reales_vs_artificiales,
     resumen_distancias,
 )
+# `factibilidad` es solver-free y geo-free (compute_demand se importa perezosamente):
+# seguro re-exportarlo.
+from . import factibilidad
+from .factibilidad import candidatos_validos, verificar_hdm
+
 # `estilo` son constantes puras (sin matplotlib): es seguro re-exportarlo.
 from . import estilo
 from .estilo import (
@@ -103,6 +108,10 @@ __all__ = [
     "cobertura_por_tipo",
     "candidatos_reales_vs_artificiales",
     "resumen_distancias",
+    # factibilidad (verificación de restricciones del HDM, solver-free)
+    "factibilidad",
+    "candidatos_validos",
+    "verificar_hdm",
     # estilo (constantes puras)
     "estilo",
     "TIPOS_RESIDUO",
